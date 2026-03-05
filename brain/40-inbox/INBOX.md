@@ -17,3 +17,4 @@ Append quick notes here or as separate timestamped files.
 
 ## Entries
 - [2026-03-05T01:48:00Z] Initialized hierarchical memory skeleton.
+- [2026-03-05T02:02:21Z] Implemented quick capture entrypoint for hierarchical memory. (P1) -> entries/2026-03-05-20260305T020221Z.md
