@@ -56,14 +56,27 @@ Capture first, reorganize during daily consolidation.
 
 ## Daily consolidation
 
-Run:
+Run once manually:
 
 ```bash
 skills/qmd-memory/scripts/daily-consolidate.sh
 ```
 
-This script should:
-1. sweep inbox entries
-2. append daily summary
-3. suggest promotions to top/domain/project layers
-4. keep raw session traces intact
+Install daily cron (default `23:55 UTC`):
+
+```bash
+skills/qmd-memory/scripts/install-cron.sh
+```
+
+Custom schedule:
+
+```bash
+skills/qmd-memory/scripts/install-cron.sh "5 0 * * *"
+```
+
+The consolidation pipeline:
+1. snapshots all today's session logs into `brain/30-sessions/YYYY-MM/`
+2. builds `brain/50-daily/YYYY-MM-DD.md`
+3. lists inbox entries and promotion checklist
+4. refreshes qmd index/embeddings (best effort)
+5. stamps last consolidation time into `00-top/MASTER_MEMORY.md`
