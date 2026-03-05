@@ -22,3 +22,18 @@ brain/tools/capture-note.sh "Check CUDA setup for faster QMD" "infra,qmd" "P2"
 - Defaults:
   - tags = `quick-note`
   - priority = `P2`
+
+## Trigger Hook (chat)
+
+When user says **"记住这个"**, Kimi should automatically run capture.
+
+Recommended pattern:
+
+- `记住这个：<内容>` → capture `<内容>` directly
+- `记住这个 <内容>` → capture `<内容>` directly
+- If user only says `记住这个` without content, ask one short follow-up: `要记什么？`
+
+Default capture params for trigger hook:
+
+- tags: `user-memory,quick-capture`
+- priority: `P1`

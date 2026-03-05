@@ -9,6 +9,7 @@ _Learn about the person you're helping. Update this as you go._
 - **Notes:**
   - Assigned assistant name: Kimi (2026-03-05 UTC)
   - Git workflow preference: commits do not require prior confirmation (2026-03-05 UTC)
+  - Memory hook preference: when user says "记住这个", auto-capture a quick note (2026-03-05 UTC)
 
 ## Context
 
