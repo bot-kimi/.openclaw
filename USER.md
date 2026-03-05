@@ -13,6 +13,7 @@ _Learn about the person you're helping. Update this as you go._
   - Consolidation schedule preference: run daily at 03:00 in user's local timezone (2026-03-05 UTC)
   - Notion integration preference: after each consolidation, create a daily report page in Notion database `31a84f61933e80358481f064fe64b58c` with 3 sections (done well/improve), and treat `Jasmine's home` page as Kimi's living notebook (2026-03-05 UTC)
   - Coding workflow preference: for non-trivial coding tasks, always use the `coding-session-router` skill (cursor-agent for quick tasks, opencode for long-lived resumable sessions) (2026-03-05 UTC)
+  - Git workflow preference: after every git commit, always push (2026-03-05 UTC)
 
 ## Context
 
