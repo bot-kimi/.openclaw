@@ -80,3 +80,4 @@ The consolidation pipeline:
 3. lists inbox entries and promotion checklist
 4. refreshes qmd index/embeddings (best effort)
 5. stamps last consolidation time into `00-top/MASTER_MEMORY.md`
+6. creates Notion daily report page via `scripts/notion-daily-report.sh`
