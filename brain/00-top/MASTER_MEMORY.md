@@ -1,0 +1,25 @@
+---
+id: mem-20260305-master
+title: Master Memory Index
+level: top
+priority: P0
+status: active
+tags: [index, memory]
+source: system
+created_at: 2026-03-05T01:48:00Z
+updated_at: 2026-03-05T01:48:00Z
+related: []
+---
+
+# Master Memory Index
+
+## Core
+- Identity: `../../IDENTITY.md`
+- User Profile: `../../USER.md`
+- Behavioral Core: `../../SOUL.md`
+
+## Active Projects
+- (to be added)
+
+## Critical Constraints (P0)
+- Commit workflow: direct commit allowed by user (2026-03-05 UTC)
