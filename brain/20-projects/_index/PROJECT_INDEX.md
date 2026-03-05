@@ -13,6 +13,9 @@ related: []
 
 # Project Memory Index
 
+## Active Projects
+- `qmd-memory-system/` — hierarchical memory architecture and reflection automation
+
 Create one folder per project/task:
 
 `20-projects/<project-slug>/`

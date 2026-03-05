@@ -23,5 +23,9 @@ related: []
 
 ## Critical Constraints (P0)
 - Commit workflow: direct commit allowed by user (2026-03-05 UTC)
+- Memory hook preference: when user says `记住这个`, auto-capture quick note; if content missing ask `要记什么？` (2026-03-05 UTC)
 
-- Last daily consolidation: 2026-03-05T02:30:00Z
+## Active Focus
+- Building and stabilizing QMD hierarchical memory system with reflective consolidation.
+
+- Last daily consolidation: 2026-03-05T02:45:52Z
