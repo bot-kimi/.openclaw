@@ -14,5 +14,6 @@ related: []
 # Open TODOs
 
 - Verify cron run history daily for the new OpenClaw reflection job.
+- Tune `openclaw cron run` debug invocation to avoid false timeout interpretation when `finished: ok` exists in run history.
 - Add reproducible setup/ops scripts in repo (`setup-qmd.sh`, reindex helper, ops doc).
 - Define promotion heuristics from inbox -> domains/projects/top with explicit thresholds.
