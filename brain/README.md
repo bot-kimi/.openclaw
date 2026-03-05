@@ -44,3 +44,30 @@ related: []
 3. Consolidate daily into `50-daily/` and route durable knowledge upward.
 4. Promote stable knowledge to `00-top/`, `10-domains/`, or `20-projects/`.
 5. Keep docs QMD-searchable: small markdown files, explicit titles/tags, rich context.
+
+## QMD Setup (Step 2)
+
+Collections:
+- `brain` -> `./brain/**/*.md`
+- `legacy-memory` -> `./memory/**/*.md`
+
+Useful commands:
+
+```bash
+# index refresh
+qmd update
+
+# embeddings refresh
+qmd embed
+
+# fast keyword search
+qmd search "<query>" -c brain --json -n 10
+
+# semantic search
+qmd vsearch "<query>" -c brain --json -n 10
+
+# best quality hybrid retrieval
+qmd query "<query>" --json -n 10
+```
+
+Note: On this host, QMD currently runs in CPU mode (CUDA toolkit missing).
