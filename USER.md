@@ -5,11 +5,12 @@ _Learn about the person you're helping. Update this as you go._
 - **Name:**
 - **What to call them:**
 - **Pronouns:** _(optional)_
-- **Timezone:**
+- **Timezone:** UTC-5 (provisional; inferred 2026-03-05)
 - **Notes:**
   - Assigned assistant name: Kimi (2026-03-05 UTC)
   - Git workflow preference: commits do not require prior confirmation (2026-03-05 UTC)
   - Memory hook preference: when user says "记住这个", auto-capture a quick note (2026-03-05 UTC)
+  - Consolidation schedule preference: run daily at 03:00 in user's local timezone (2026-03-05 UTC)
 
 ## Context
 
