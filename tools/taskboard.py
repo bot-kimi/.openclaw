@@ -95,46 +95,301 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+# ── HTML dashboard ──────────────────────────────────────────────────
+
+_HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TaskBoard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  background:#0d1117;color:#c9d1d9;line-height:1.5;min-height:100%;
+}
+.wrap{max-width:1440px;margin:0 auto;padding:20px 24px}
+
+/* ── header ── */
+.hdr{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.hdr h1{font-size:18px;font-weight:600;color:#f0f6fc;letter-spacing:-.01em}
+.dot{width:7px;height:7px;border-radius:50%;background:#3fb950;
+  box-shadow:0 0 6px rgba(63,185,80,.45);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hdr .meta{font-size:12px;color:#484f58;margin-left:auto;white-space:nowrap}
+
+/* ── filters ── */
+.filters{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.fbtn{
+  padding:3px 14px;border:1px solid #30363d;border-radius:16px;
+  background:transparent;color:#8b949e;font-size:12px;font-family:inherit;
+  cursor:pointer;transition:all .15s ease;user-select:none;outline:none;
+}
+.fbtn:hover{border-color:#58a6ff;color:#58a6ff}
+.fbtn.on{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.fbtn .n{
+  display:inline-block;min-width:16px;text-align:center;
+  margin-left:4px;padding:0 5px;border-radius:8px;
+  font-size:10px;font-weight:600;background:rgba(255,255,255,.08);
+}
+.fbtn.on .n{background:rgba(255,255,255,.2)}
+
+/* ── table ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  text-align:left;padding:6px 12px;font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:#484f58;
+  border-bottom:1px solid #21262d;position:sticky;top:0;background:#0d1117;
+  z-index:2;
+}
+tbody tr{border-bottom:1px solid rgba(33,38,45,.6);cursor:pointer;transition:background .12s}
+tbody tr:hover{background:#161b22}
+td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
+
+.c-id{
+  font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;
+  font-size:12px;color:#58a6ff;
+}
+.c-label{color:#c9d1d9;font-weight:500;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.c-cmd{
+  color:#484f58;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;
+  font-family:'SF Mono',SFMono-Regular,Consolas,monospace;
+}
+.c-dur,.c-exit{text-align:right;font-family:monospace;font-size:12px;color:#8b949e}
+.c-time{font-size:12px;color:#8b949e}
+.c-time .rel{color:#c9d1d9;font-weight:500}
+.c-time .abs{color:#484f58;font-size:11px;margin-left:6px}
+
+/* ── chips ── */
+.chip{
+  display:inline-block;padding:1px 10px;border-radius:10px;
+  font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap;
+}
+.chip-running{background:rgba(56,139,253,.15);color:#58a6ff}
+.chip-completed{background:rgba(63,185,80,.15);color:#3fb950}
+.chip-failed{background:rgba(248,81,73,.15);color:#f85149}
+
+/* ── empty state ── */
+.empty{text-align:center;padding:48px 0;color:#484f58;font-size:14px}
+
+/* ── modal overlay ── */
+.overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(1,4,9,.7);backdrop-filter:blur(4px);
+  z-index:100;justify-content:center;align-items:center;
+}
+.overlay.open{display:flex}
+
+/* ── modal ── */
+.modal{
+  background:#161b22;border:1px solid #30363d;border-radius:10px;
+  width:92%;max-width:680px;max-height:82vh;overflow-y:auto;
+  padding:20px 24px;box-shadow:0 16px 48px rgba(0,0,0,.4);
+}
+.m-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.m-head h2{font-size:15px;color:#f0f6fc;font-weight:600}
+.m-close{
+  background:none;border:none;color:#484f58;font-size:22px;
+  cursor:pointer;padding:2px 8px;line-height:1;border-radius:4px;
+}
+.m-close:hover{color:#f0f6fc;background:#21262d}
+.m-grid{display:grid;grid-template-columns:90px 1fr;gap:6px 14px;font-size:13px}
+.m-lbl{color:#484f58;font-weight:600;text-align:right}
+.m-val{color:#c9d1d9;word-break:break-word}
+.m-val.mono{font-family:'SF Mono',SFMono-Regular,Consolas,monospace;font-size:12px}
+.m-section{
+  margin-top:16px;font-size:11px;font-weight:600;color:#484f58;
+  text-transform:uppercase;letter-spacing:.05em;
+}
+.m-out{
+  margin-top:6px;background:#0d1117;border:1px solid #21262d;border-radius:6px;
+  padding:10px 12px;font-family:'SF Mono',SFMono-Regular,Consolas,monospace;
+  font-size:12px;white-space:pre-wrap;word-break:break-all;
+  max-height:260px;overflow-y:auto;color:#c9d1d9;line-height:1.5;
+}
+
+/* ── scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#484f58}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="dot"></div>
+    <h1>TaskBoard</h1>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div class="filters" id="filters"></div>
+  <table>
+    <thead><tr>
+      <th>ID</th><th>Label</th><th>Status</th>
+      <th>Started</th><th>Duration</th><th>Exit</th><th>Command</th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">No tasks match this filter.</div>
+</div>
+
+<div class="overlay" id="ov">
+  <div class="modal" id="mdl">
+    <div class="m-head">
+      <h2 id="m-title"></h2>
+      <button class="m-close" id="m-x">&times;</button>
+    </div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+var T = __TASKS_JSON__;
+var filter = 'all';
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function relTime(iso) {
+  if (!iso) return '\u2014';
+  var s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 0) return 'just now';
+  if (s < 60) return s + 's ago';
+  var m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  var h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+
+function localT(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric'})
+    + ' ' + d.toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+}
+
+function fullLocal(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString(undefined, {
+    year:'numeric', month:'short', day:'numeric',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+}
+
+function fmtDur(v) {
+  if (v == null) return '\u2014';
+  v = Math.round(v);
+  if (v < 1) return '<1s';
+  if (v < 60) return v + 's';
+  var m = Math.floor(v / 60), s = v % 60;
+  if (m < 60) return m + 'm' + (s ? ' ' + s + 's' : '');
+  var h = Math.floor(m / 60); m = m % 60;
+  return h + 'h' + (m ? ' ' + m + 'm' : '');
+}
+
+function chipHtml(st) {
+  return '<span class="chip chip-' + esc(st || 'running') + '">' + esc(st) + '</span>';
+}
+
+function counts() {
+  var c = {all: T.length, running: 0, completed: 0, failed: 0};
+  T.forEach(function(t) { if (c[t.status] !== undefined) c[t.status]++; });
+  return c;
+}
+
+function renderFilters() {
+  var c = counts(), el = document.getElementById('filters');
+  el.innerHTML = '';
+  ['all','running','completed','failed'].forEach(function(f) {
+    var b = document.createElement('button');
+    b.className = 'fbtn' + (filter === f ? ' on' : '');
+    b.innerHTML = f.charAt(0).toUpperCase() + f.slice(1)
+      + '<span class="n">' + c[f] + '</span>';
+    b.onclick = function() { filter = f; render(); };
+    el.appendChild(b);
+  });
+}
+
+function render() {
+  renderFilters();
+  var list = filter === 'all' ? T.slice() : T.filter(function(t) { return t.status === filter; });
+  list.sort(function(a, b) { return (b.start || '').localeCompare(a.start || ''); });
+  document.getElementById('meta').textContent =
+    list.length + ' of ' + T.length + ' tasks \u00b7 live';
+  var tb = document.getElementById('tb'), emp = document.getElementById('empty');
+  tb.innerHTML = '';
+  if (!list.length) { emp.style.display = 'block'; return; }
+  emp.style.display = 'none';
+  list.forEach(function(t) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="c-id">' + esc(t.id) + '</td>' +
+      '<td class="c-label">' + esc(t.label) + '</td>' +
+      '<td>' + chipHtml(t.status) + '</td>' +
+      '<td class="c-time" title="' + esc(t.start) + '">' +
+        '<span class="rel">' + relTime(t.start) + '</span>' +
+        '<span class="abs">' + localT(t.start) + '</span></td>' +
+      '<td class="c-dur">' + fmtDur(t.duration) + '</td>' +
+      '<td class="c-exit">' + (t.exitCode != null ? t.exitCode : '\u2014') + '</td>' +
+      '<td class="c-cmd" title="' + esc(t.cmd) + '">' + esc(t.cmd || '\u2014') + '</td>';
+    tr.onclick = function() { openModal(t); };
+    tb.appendChild(tr);
+  });
+}
+
+function openModal(t) {
+  document.getElementById('m-title').textContent = t.label + ' \u2014 ' + t.id;
+  var rows = [
+    ['Status',   chipHtml(t.status)],
+    ['ID',       '<span class="mono">' + esc(t.id) + '</span>'],
+    ['Started',  fullLocal(t.start) +
+      ' <span style="color:#484f58">(' + esc(t.start) + ')</span>'],
+    ['Ended',    t.end
+      ? fullLocal(t.end) + ' <span style="color:#484f58">(' + esc(t.end) + ')</span>'
+      : '\u2014'],
+    ['Duration', fmtDur(t.duration) +
+      (t.duration != null ? ' <span style="color:#484f58">(' + t.duration + 's)</span>' : '')],
+    ['Exit',     t.exitCode != null ? String(t.exitCode) : '\u2014'],
+    ['Command',  '<span class="mono">' + esc(t.cmd || '\u2014') + '</span>'],
+  ];
+  var h = '<div class="m-grid">';
+  rows.forEach(function(r) {
+    h += '<div class="m-lbl">' + r[0] + '</div><div class="m-val">' + r[1] + '</div>';
+  });
+  h += '</div>';
+  if (t.lastOutput) {
+    h += '<div class="m-section">Output</div><div class="m-out">' + esc(t.lastOutput) + '</div>';
+  }
+  document.getElementById('m-body').innerHTML = h;
+  document.getElementById('ov').classList.add('open');
+}
+
+function closeModal() { document.getElementById('ov').classList.remove('open'); }
+document.getElementById('m-x').onclick = closeModal;
+document.getElementById('ov').onclick = function(e) { if (e.target === this) closeModal(); };
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+setInterval(function() {
+  fetch('/api/tasks').then(function(r) { return r.json(); })
+    .then(function(d) { T = d; render(); }).catch(function() {});
+}, 5000);
+
+render();
+})();
+</script>
+</body>
+</html>"""
+
+
 def _build_html(tasks: list[dict[str, Any]]) -> str:
-    rows = ""
-    for t in tasks:
-        sc = {"running": "#2196F3", "completed": "#4CAF50", "failed": "#f44336"}.get(
-            t.get("status", ""), "#999"
-        )
-        last = (t.get("lastOutput") or "").replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")
-        rows += (
-            "<tr>"
-            f'<td>{t.get("id","")}</td>'
-            f'<td>{t.get("label","")}</td>'
-            f'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{t.get("cmd","")}</td>'
-            f'<td><span style="color:{sc};font-weight:700">{t.get("status","")}</span></td>'
-            f'<td>{t.get("start","")}</td>'
-            f'<td>{t.get("end","") or ""}</td>'
-            f'<td>{t.get("duration") if t.get("duration") is not None else ""}</td>'
-            f'<td>{t.get("exitCode","") if t.get("exitCode") is not None else ""}</td>'
-            f'<td style="max-width:340px;overflow:auto;white-space:pre-wrap;font-size:12px">{last}</td>'
-            "</tr>\n"
-        )
-    return (
-        '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        "<title>TaskBoard</title>"
-        '<meta http-equiv="refresh" content="5">'
-        "<style>"
-        "body{font-family:system-ui,sans-serif;margin:20px;background:#1a1a2e;color:#e0e0e0}"
-        "h1{color:#e94560}"
-        "table{border-collapse:collapse;width:100%}"
-        "th,td{border:1px solid #333;padding:6px 10px;text-align:left}"
-        "th{background:#16213e}"
-        "tr:nth-child(even){background:#0f3460}"
-        "tr:hover{background:#1a1a4e}"
-        "</style></head><body>"
-        "<h1>TaskBoard</h1>"
-        f'<p style="color:#888">Auto-refreshes every 5s &middot; {len(tasks)} task(s)</p>'
-        "<table>"
-        "<tr><th>ID</th><th>Label</th><th>Command</th><th>Status</th>"
-        "<th>Start</th><th>End</th><th>Duration(s)</th><th>Exit</th><th>Last Output</th></tr>\n"
-        f"{rows}</table></body></html>"
-    )
+    safe = json.dumps(tasks, ensure_ascii=False).replace("</", "<\\/")
+    return _HTML_TEMPLATE.replace("__TASKS_JSON__", safe)
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
@@ -144,11 +399,19 @@ def cmd_serve(args: argparse.Namespace) -> int:
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             tasks = _load()
-            html = _build_html(tasks)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode())
+            if self.path == "/api/tasks":
+                body = json.dumps(tasks, ensure_ascii=False).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                html = _build_html(tasks)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(html.encode())
 
         def log_message(self, fmt: str, *a: Any) -> None:
             pass

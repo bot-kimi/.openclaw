@@ -49,7 +49,19 @@ python3 tools/taskboard.py serve                 # http://0.0.0.0:9876
 python3 tools/taskboard.py serve --port 8080     # custom port
 ```
 
-The dashboard auto-refreshes every 5 seconds and shows all tasks in a color-coded table.
+The dashboard auto-refreshes every 5 seconds and shows all tasks in a refined table UI.
+
+### UI features
+
+- Status chips (`running` / `completed` / `failed`)
+- Quick filters: `All`, `Running`, `Completed`, `Failed`
+- Human-friendly start time display (relative + local time)
+- Compact rows with ellipsis for long command strings
+- Click any row to open a detail modal with:
+  - full command
+  - full/expanded output
+  - raw ISO timestamps + localized timestamps
+  - duration + exit code
 
 ## Integration
 
