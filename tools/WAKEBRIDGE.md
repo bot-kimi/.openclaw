@@ -1,13 +1,8 @@
 # WakeBridge
 
-用于 webchat 场景的“后台命令完成即唤醒”桥接器。
+Run a command in the background and trigger OpenClaw system events on start/exit.
 
-思路：
-- 后台运行命令
-- 通过 `openclaw system event --mode now` 发送**结构化短事件**（`WB_START`/`WB_DONE`）
-- 让主会话在命令结束时被立即唤醒并回消息，同时尽量降低系统提示噪音
-
-## 用法
+## Usage
 
 ```bash
 python3 tools/wakebridge.py \
@@ -16,28 +11,47 @@ python3 tools/wakebridge.py \
   --cwd /home/jasm/.openclaw/workspace
 ```
 
-可选：
-- `--emit-start`：开始时也触发一次唤醒事件
-- `--tail-lines 12`：结束事件里附带的输出尾行数
+### Options
 
-## 推荐执行方式（后台）
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--cmd` | *(required)* | Shell command to run |
+| `--label` | `任务` | Display label for events and taskboard |
+| `--cwd` | current dir | Working directory |
+| `--emit-start` | off | Also emit a `WB_START` system event |
+| `--tail-lines` | 12 | Number of tail lines included in exit event |
+| `--no-taskboard` | off | Skip TaskBoard registration |
+
+## Background execution
 
 ```bash
-python3 tools/wakebridge.py --cmd 'bash ./command.sh' --label 'command.sh' --cwd /home/jasm/.openclaw/workspace --emit-start &
+python3 tools/wakebridge.py \
+  --cmd 'bash ./command.sh' \
+  --label 'command.sh' \
+  --cwd /home/jasm/.openclaw/workspace \
+  --emit-start &
 ```
 
-然后当前会话会先收到“已开始”；
-命令结束时，WakeBridge 会触发系统事件，主会话会再发“已结束”。
-
-## 一键方式（推荐）
-
-新增了包装脚本：
+## One-liner (recommended)
 
 ```bash
 tools/runlong.sh 'bash ./command.sh' 'command.sh'
 ```
 
-它会自动：
-- 使用当前目录作为 `--cwd`
-- 打开 `--emit-start`
-- 保留结束事件推送
+Automatically sets `--cwd` to current directory and enables `--emit-start`.
+
+## TaskBoard integration
+
+WakeBridge automatically registers each run on the TaskBoard (`tools/taskboard.py`):
+
+1. On start: adds a task with status `running`
+2. On completion: updates to `completed` or `failed` with exit code, duration, and tail output
+
+To disable: pass `--no-taskboard`.
+
+View tasks: `python3 tools/taskboard.py list` or `python3 tools/taskboard.py serve`.
+
+## Events emitted
+
+- `WB_START`: label, timestamp, command (only with `--emit-start`)
+- `WB_DONE`: label, status (SUCCESS/FAILED), exit code, duration, command, tail output
