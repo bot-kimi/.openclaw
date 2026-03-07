@@ -17,6 +17,7 @@ _Learn about the person you're helping. Update this as you go._
   - Git workflow preference: after every git commit, always push (2026-03-05 UTC)
   - Long-running command workflow preference: use WakeBridge/`tools/runlong.sh` to ensure start/end (including failure) notifications in-session (2026-03-07 UTC)
   - Coding workflow stability preference: when using coding skills/agents, always run agent in background and rely on completion wake-up; never block the main chat turn with foreground coding runs (2026-03-07 UTC)
+  - Infra workflow reminder: for private/org GitHub repos, clone via SSH (`git@github.com:owner/repo.git`) using existing SSH key; do not default to HTTPS (2026-03-07 UTC)
 
 ## Context
 
