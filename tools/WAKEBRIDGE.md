@@ -4,8 +4,8 @@
 
 思路：
 - 后台运行命令
-- 通过 `openclaw system event --mode now` 发送系统事件
-- 让主会话在命令结束时被立即唤醒并回消息
+- 通过 `openclaw system event --mode now` 发送**结构化短事件**（`WB_START`/`WB_DONE`）
+- 让主会话在命令结束时被立即唤醒并回消息，同时尽量降低系统提示噪音
 
 ## 用法
 

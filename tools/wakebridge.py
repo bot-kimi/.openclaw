@@ -32,8 +32,7 @@ def main() -> int:
     start_at = dt.datetime.now(dt.timezone.utc)
     if args.emit_start:
         run_system_event(
-            f"[WakeBridge] {args.label} started. cmd={args.cmd} at {start_at.isoformat()} UTC. "
-            "Send a short user-facing update in Chinese: 任务已开始执行。"
+            f"WB_START label={args.label} ts={start_at.isoformat()} cmd={args.cmd}"
         )
 
     proc = subprocess.Popen(
@@ -61,10 +60,10 @@ def main() -> int:
     tail_block = "\\n".join(tail) if tail else "(no output)"
 
     status = "SUCCESS" if code == 0 else "FAILED"
+    compact_tail = tail_block.replace("\n", "\\n")
     run_system_event(
-        f"[WakeBridge] {args.label} finished. status={status} exit={code} duration={sec}s. "
-        f"cmd={args.cmd}. Tail output:\n{tail_block}\n"
-        "Please send a concise user-facing completion update in Chinese with result summary."
+        f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
+        f"cmd={args.cmd} tail={compact_tail}"
     )
 
     return code
