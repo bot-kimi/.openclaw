@@ -23,8 +23,21 @@ python3 tools/wakebridge.py \
 ## 推荐执行方式（后台）
 
 ```bash
-python3 tools/wakebridge.py --cmd 'bash ./command.sh' --label 'command.sh' --cwd /home/jasm/.openclaw/workspace &
+python3 tools/wakebridge.py --cmd 'bash ./command.sh' --label 'command.sh' --cwd /home/jasm/.openclaw/workspace --emit-start &
 ```
 
-然后当前会话先回复“已开始执行”；
-命令结束时，WakeBridge 会触发系统事件，主会话应可立即发出“已结束”消息。
+然后当前会话会先收到“已开始”；
+命令结束时，WakeBridge 会触发系统事件，主会话会再发“已结束”。
+
+## 一键方式（推荐）
+
+新增了包装脚本：
+
+```bash
+tools/runlong.sh 'bash ./command.sh' 'command.sh'
+```
+
+它会自动：
+- 使用当前目录作为 `--cwd`
+- 打开 `--emit-start`
+- 保留结束事件推送
