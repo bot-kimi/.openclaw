@@ -1,15 +1,16 @@
-# WakeWatch (MVP)
+# WakeWatch (MVP+)
 
 一个最小可用的“事件驱动唤醒”工具原型：
 
 - 执行长命令
 - 实时读取 stdout/stderr
 - 命中正则规则时写入事件（JSONL）
-- 同时写入 start/exit 事件
+- 写入 start/exit 事件
+- 可选执行 hook 命令（on-start / on-match / on-exit）
 
 > 依赖：Python 3 标准库，无第三方包。
 
-## 用法
+## 基础用法
 
 ```bash
 python3 tools/wakewatch.py \
@@ -22,6 +23,27 @@ python3 tools/wakewatch.py \
 可选参数：
 
 - `--cwd <dir>`：命令执行目录
+
+## Hook 用法（关键）
+
+可以在事件触发时执行 shell 命令：
+
+```bash
+python3 tools/wakewatch.py \
+  --cmd 'bash ./command.sh' \
+  --rule 'part1::密码的第一部分是(.+)' \
+  --rule 'part2::密码的第二部分是(.+)' \
+  --events /tmp/wakewatch-events.jsonl \
+  --on-start-cmd "echo START >> /tmp/wakewatch-notify.log" \
+  --on-match-cmd "echo MATCH:$rule:$group1 >> /tmp/wakewatch-notify.log" \
+  --on-exit-cmd "echo EXIT:$exitCode >> /tmp/wakewatch-notify.log"
+```
+
+### 模板变量
+
+- 通用：`$type` `$ts`
+- match：`$rule` `$source` `$line` `$group1 ... $group5`
+- exit：`$exitCode`
 
 ## 事件格式
 
@@ -40,10 +62,12 @@ python3 tools/wakewatch.py \
 {"ts":"2026-03-07T20:00:31+00:00","type":"exit","exitCode":0}
 ```
 
-## 下一步（可选）
+## 下一步（接 OpenClaw 唤醒）
 
-如果要直接“唤醒主会话”，可以再加一个小桥接器：
+当前 hook 已经能接“桥接命令”。接下来可以把 `--on-match-cmd` 指向一个 OpenClaw 消息发送器（或 session 通知器），实现：
 
-- tail `events.jsonl`
-- 读到 `match` 就调用 `sessions_send`
-- 从而在任务中途主动发消息（而不是等命令全部结束）
+1. 第一段输出命中就立即推送
+2. 第二段输出命中再推送
+3. exit 再推送状态
+
+这就是你要的“沉睡中被事件唤醒”。
