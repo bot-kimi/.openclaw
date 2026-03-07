@@ -9,7 +9,8 @@ _Learn about the person you're helping. Update this as you go._
 - **Notes:**
   - Assigned assistant name: Kimi (2026-03-05 UTC)
   - Git workflow preference: commits do not require prior confirmation (2026-03-05 UTC)
-  - Memory hook preference: when user says "记住这个", auto-capture a quick note (2026-03-05 UTC)
+  - Memory hook preference: when user says "记住这个", auto-capture a quick note via advanced qmd-memory workflow (2026-03-05 UTC; reinforced 2026-03-07 UTC)
+  - Memory workflow preference: use advanced memory system (qmd-memory) as the default/primary recall path; do not rely on OpenClaw memory_search for normal recall (2026-03-07 UTC)
   - Consolidation schedule preference: run daily at 03:00 in user's local timezone (2026-03-05 UTC)
   - Notion integration preference: after each consolidation, create a daily report page in Notion database `31a84f61933e80358481f064fe64b58c` with 3 sections (done well/improve), and treat `Jasmine's home` page as Kimi's living notebook (2026-03-05 UTC)
   - Daily report language preference: content posted to Notion should be in Chinese (2026-03-05 UTC)
