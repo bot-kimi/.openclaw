@@ -11,11 +11,13 @@ import argparse
 import datetime as dt
 import subprocess
 import sys
+import urllib.request
 import uuid
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parent
 TASKBOARD_PY = TOOLS_DIR / "taskboard.py"
+TASKBOARD_URL = "http://127.0.0.1:9876/api/tasks"
 
 
 def run_system_event(text: str, mode: str = "now") -> None:
@@ -23,6 +25,14 @@ def run_system_event(text: str, mode: str = "now") -> None:
     p = subprocess.run(cmd, text=True, capture_output=True)
     if p.returncode != 0:
         sys.stderr.write(f"[wakebridge] system event failed rc={p.returncode}: {p.stderr}\n")
+
+
+def _taskboard_running() -> bool:
+    try:
+        with urllib.request.urlopen(TASKBOARD_URL, timeout=1.2) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
 
 
 def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str) -> None:
@@ -68,6 +78,15 @@ def main() -> int:
     task_id = uuid.uuid4().hex[:8]
     start_at = dt.datetime.now(dt.timezone.utc)
     start_iso = start_at.isoformat(timespec="seconds")
+
+    if not args.no_taskboard and not _taskboard_running():
+        msg = (
+            "WB_ERROR reason=taskboard_down "
+            f"label={args.label} hint='start taskboard: python3 tools/taskboard.py serve --host 0.0.0.0 --port 9876'"
+        )
+        run_system_event(msg)
+        sys.stderr.write("[wakebridge] TaskBoard is not running on :9876; refusing long task.\n")
+        return 97
 
     if args.emit_start:
         run_system_event(
