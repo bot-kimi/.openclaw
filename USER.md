@@ -23,6 +23,7 @@ _Learn about the person you're helping. Update this as you go._
   - Experiment tracking preference: sync all experiment records to Google Sheets master file `general` (ID: `1vsic-xRGf6uzWJ58SUGNEE116FnInfAiWKePLj0bA34`); use sub-sheets/tabs for specific experiment tracks (2026-03-07 UTC)
   - TPU local-dev default python rule: use `/kmh-nfs-ssd-us-mount/code/hanhong/miniforge3/bin/python` by default; do not casually install packages into this shared environment (2026-03-08 UTC)
   - Background execution HARD rule: “后台执行” strictly means WakeBridge (`tools/runlong.sh`), not plain background exec; require start/end/failure notifications (reinforced 2026-03-08 UTC)
+  - Alarm policy update: do not require manual paired alarm for every task; prefer automatic `system-alarm` via `--timeout-sec > 20`, with immediate warning if missing; manual `alarm` tags are optional for ad-hoc checks (2026-03-08 UTC)
   - Task monitoring reliability rule: if TaskBoard UI (`tools/taskboard.py` on :9876) is down, WakeBridge should fail fast and force recovery before long tasks (2026-03-08 UTC)
   - Heartbeat discrimination rule: never reply `HEARTBEAT_OK` to WakeBridge/system status messages (`WB_START`/`WB_DONE`/`Exec completed`); treat them as task status events (2026-03-08 UTC)
   - TPU multi-host init rule: remote TPU ops/init must default to `--worker=all`; multi-worker TPU must initialize simultaneously (2026-03-08 UTC)
