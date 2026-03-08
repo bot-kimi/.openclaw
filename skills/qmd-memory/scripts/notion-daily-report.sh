@@ -70,24 +70,23 @@ lines=[l.strip('- ').strip() for l in section.splitlines() if l.strip().startswi
 if not lines:
     lines=["No reflection summary found."]
 
-today_done=[]
+# "今天做了什么"优先完整覆盖，避免遗漏关键主题（如 onboarding/复盘要点）
+today_done=list(lines)
 well=[]
 improve=[]
 for ln in lines:
     l=ln.lower()
-    if 'key decision' in l or 'pattern' in l or 'preference' in l:
-        today_done.append(ln)
-    if 'well' in l or 'good' in l or '成功' in ln or '升级' in ln or '完成' in ln:
+    if ('well' in l or 'good' in l or 'success' in l
+        or '成功' in ln or '升级' in ln or '完成' in ln or '修复' in ln or '优化' in ln):
         well.append(ln)
-    if 'unresolved' in l or 'improve' in l or '改进' in ln or 'loop' in l:
+    if ('unresolved' in l or 'improve' in l or 'loop' in l or 'risk' in l
+        or '改进' in ln or '待' in ln or '问题' in ln or '风险' in ln):
         improve.append(ln)
 
-if not today_done:
-    today_done=lines[:3]
 if not well:
-    well=["Built and ran daily consolidation pipeline with reflective summary."]
+    well=lines[:2] if len(lines) >= 2 else lines
 if not improve:
-    improve=["Improve reliability and speed of cron reflection runs."]
+    improve=["继续补齐未闭环事项，并把关键规则固化为可执行检查项。"]
 
 headers={
     'Authorization': f'Bearer {notion_key}',
