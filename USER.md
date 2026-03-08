@@ -18,6 +18,7 @@ _Learn about the person you're helping. Update this as you go._
   - Git workflow preference: after every git commit, always push (2026-03-05 UTC)
   - Long-running command workflow HARD rule: “后台执行” means using WakeBridge/`tools/runlong.sh` (not plain background exec), to ensure start/end/failure notifications in-session (2026-03-07 UTC; reinforced 2026-03-08 UTC)
   - Coding workflow stability preference: when using coding skills/agents, always run agent in background and rely on completion wake-up; never block the main chat turn with foreground coding runs (2026-03-07 UTC)
+  - Coding execution platform preference: do not use subagents/sessions_spawn for coding runs; use TaskBoard/WakeBridge-based background task scheduling only (2026-03-08 UTC)
   - Infra workflow reminder: for private/org GitHub repos, clone via SSH (`git@github.com:owner/repo.git`) using existing SSH key; do not default to HTTPS (2026-03-07 UTC)
   - Experiment tracking preference: sync all experiment records to Google Sheets master file `general` (ID: `1vsic-xRGf6uzWJ58SUGNEE116FnInfAiWKePLj0bA34`); use sub-sheets/tabs for specific experiment tracks (2026-03-07 UTC)
   - TPU local-dev default python rule: use `/kmh-nfs-ssd-us-mount/code/hanhong/miniforge3/bin/python` by default; do not casually install packages into this shared environment (2026-03-08 UTC)
