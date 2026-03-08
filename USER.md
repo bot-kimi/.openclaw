@@ -20,6 +20,7 @@ _Learn about the person you're helping. Update this as you go._
   - Coding workflow stability preference: when using coding skills/agents, always run agent in background and rely on completion wake-up; never block the main chat turn with foreground coding runs (2026-03-07 UTC)
   - Infra workflow reminder: for private/org GitHub repos, clone via SSH (`git@github.com:owner/repo.git`) using existing SSH key; do not default to HTTPS (2026-03-07 UTC)
   - Experiment tracking preference: sync all experiment records to Google Sheets master file `general` (ID: `1vsic-xRGf6uzWJ58SUGNEE116FnInfAiWKePLj0bA34`); use sub-sheets/tabs for specific experiment tracks (2026-03-07 UTC)
+  - TPU local-dev default python rule: use `/kmh-nfs-ssd-us-mount/code/hanhong/miniforge3/bin/python` by default; do not casually install packages into this shared environment (2026-03-08 UTC)
 
 ## Context
 
