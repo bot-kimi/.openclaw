@@ -18,6 +18,7 @@ from pathlib import Path
 TOOLS_DIR = Path(__file__).resolve().parent
 TASKBOARD_PY = TOOLS_DIR / "taskboard.py"
 TASKBOARD_URL = "http://127.0.0.1:9876/api/tasks"
+TASKBOARD_LOG_DIR = TOOLS_DIR.parent / ".openclaw" / "taskboard" / "logs"
 
 
 def run_system_event(text: str, mode: str = "now") -> None:
@@ -35,14 +36,15 @@ def _taskboard_running() -> bool:
         return False
 
 
-def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str) -> None:
+def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str, log_file: str) -> None:
     if not TASKBOARD_PY.exists():
         return
     try:
         subprocess.run(
             [sys.executable, str(TASKBOARD_PY), "add",
              "--id", task_id, "--label", label, "--cmd", cmd_str,
-             "--status", "running", "--start", start_iso],
+             "--status", "running", "--start", start_iso,
+             "--log-file", log_file],
             capture_output=True, text=True,
         )
     except Exception as exc:
@@ -78,6 +80,9 @@ def main() -> int:
     task_id = uuid.uuid4().hex[:8]
     start_at = dt.datetime.now(dt.timezone.utc)
     start_iso = start_at.isoformat(timespec="seconds")
+    TASKBOARD_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = TASKBOARD_LOG_DIR / f"{task_id}.log"
+    log_path.write_text("", encoding="utf-8")
 
     if not args.no_taskboard and not _taskboard_running():
         msg = (
@@ -94,7 +99,7 @@ def main() -> int:
         )
 
     if not args.no_taskboard:
-        _taskboard_add(task_id, args.label, args.cmd, start_iso)
+        _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path))
 
     proc = subprocess.Popen(
         args.cmd,
@@ -109,6 +114,8 @@ def main() -> int:
     tail: list[str] = []
     assert proc.stdout is not None
     for raw in proc.stdout:
+        with log_path.open("a", encoding="utf-8") as lf:
+            lf.write(raw)
         line = raw.rstrip("\n")
         if line:
             tail.append(line)
@@ -124,7 +131,7 @@ def main() -> int:
     compact_tail = tail_block.replace("\n", "\\n")
     run_system_event(
         f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
-        f"cmd={args.cmd} tail={compact_tail}"
+        f"cmd={args.cmd} log={log_path} tail={compact_tail}"
     )
 
     if not args.no_taskboard:

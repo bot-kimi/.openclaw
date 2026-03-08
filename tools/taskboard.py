@@ -14,14 +14,17 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 WORKSPACE = Path(__file__).resolve().parent.parent
 DATA_DIR = WORKSPACE / ".openclaw" / "taskboard"
 TASKS_FILE = DATA_DIR / "tasks.json"
+LOGS_DIR = DATA_DIR / "logs"
 
 
 def _ensure_dir() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _load() -> list[dict[str, Any]]:
@@ -54,6 +57,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         "duration": None,
         "exitCode": None,
         "lastOutput": args.output or "",
+        "logFile": args.log_file or "",
     }
     tasks.append(task)
     _save(tasks)
@@ -343,8 +347,22 @@ function render() {
   });
 }
 
+var modalTimer = null;
+var modalTaskId = null;
+
+function refreshModalLog() {
+  if (!modalTaskId) return;
+  fetch('/api/log?id=' + encodeURIComponent(modalTaskId))
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(txt) {
+      var el = document.getElementById('m-live-log');
+      if (el) el.textContent = txt || '(no output yet)';
+    }).catch(function() {});
+}
+
 function openModal(t) {
   document.getElementById('m-title').textContent = t.label + ' \u2014 ' + t.id;
+  modalTaskId = t.id;
   var rows = [
     ['Status',   chipHtml(t.status)],
     ['ID',       '<span class="mono">' + esc(t.id) + '</span>'],
@@ -363,14 +381,19 @@ function openModal(t) {
     h += '<div class="m-lbl">' + r[0] + '</div><div class="m-val">' + r[1] + '</div>';
   });
   h += '</div>';
-  if (t.lastOutput) {
-    h += '<div class="m-section">Output</div><div class="m-out">' + esc(t.lastOutput) + '</div>';
-  }
+  h += '<div class="m-section">Live Output</div><div id="m-live-log" class="m-out">' + esc(t.lastOutput || '(loading...)') + '</div>';
   document.getElementById('m-body').innerHTML = h;
   document.getElementById('ov').classList.add('open');
+  refreshModalLog();
+  if (modalTimer) clearInterval(modalTimer);
+  modalTimer = setInterval(refreshModalLog, 2000);
 }
 
-function closeModal() { document.getElementById('ov').classList.remove('open'); }
+function closeModal() {
+  document.getElementById('ov').classList.remove('open');
+  if (modalTimer) { clearInterval(modalTimer); modalTimer = null; }
+  modalTaskId = null;
+}
 document.getElementById('m-x').onclick = closeModal;
 document.getElementById('ov').onclick = function(e) { if (e.target === this) closeModal(); };
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
@@ -399,13 +422,34 @@ def cmd_serve(args: argparse.Namespace) -> int:
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             tasks = _load()
-            if self.path == "/api/tasks":
+            parsed = urlparse(self.path)
+            if parsed.path == "/api/tasks":
                 body = json.dumps(tasks, ensure_ascii=False).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 self.wfile.write(body)
+            elif parsed.path == "/api/log":
+                q = parse_qs(parsed.query)
+                task_id = (q.get("id") or [""])[0]
+                if not task_id:
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(b"missing id")
+                    return
+                log_path = LOGS_DIR / f"{task_id}.log"
+                if not log_path.exists():
+                    self.send_response(404)
+                    self.end_headers()
+                    self.wfile.write(b"log not found")
+                    return
+                body = log_path.read_text(encoding="utf-8", errors="replace")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body.encode("utf-8"))
             else:
                 html = _build_html(tasks)
                 self.send_response(200)
@@ -438,6 +482,7 @@ def main() -> int:
     p_add.add_argument("--status", default="running")
     p_add.add_argument("--start", default=None)
     p_add.add_argument("--output", default="")
+    p_add.add_argument("--log-file", default="")
 
     p_upd = sub.add_parser("update", help="Update an existing task")
     p_upd.add_argument("--id", required=True)
