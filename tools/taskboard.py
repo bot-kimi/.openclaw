@@ -248,11 +248,14 @@ td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
 .chip-running{background:rgba(56,139,253,.15);color:#58a6ff}
 .chip-completed{background:rgba(63,185,80,.15);color:#3fb950}
 .chip-failed{background:rgba(248,81,73,.15);color:#f85149}
+.chip-cancelled{background:rgba(210,153,34,.15);color:#d29922}
 .tag{
   display:inline-block;padding:0 6px;border-radius:6px;
   font-size:10px;background:rgba(139,148,158,.15);color:#8b949e;
   margin-right:3px;white-space:nowrap;
 }
+.tag-alarm{background:rgba(210,153,34,.25);color:#d29922}
+.tag-sysalarm{background:rgba(136,132,216,.2);color:#8884d8}
 
 /* ── empty state ── */
 .empty{text-align:center;padding:48px 0;color:#484f58;font-size:14px}
@@ -383,8 +386,17 @@ function chipHtml(st) {
   return '<span class="chip chip-' + esc(st || 'running') + '">' + esc(st) + '</span>';
 }
 
+function tagHtml(tags) {
+  return (tags||[]).map(function(g){
+    var c='tag';
+    if(g==='alarm')c+=' tag-alarm';
+    else if(g==='system-alarm')c+=' tag-sysalarm';
+    return '<span class="'+c+'">'+esc(g)+'</span>';
+  }).join(' ');
+}
+
 function counts() {
-  var c = {all: T.length, running: 0, completed: 0, failed: 0};
+  var c = {all: T.length, running: 0, completed: 0, failed: 0, cancelled: 0};
   T.forEach(function(t) { if (c[t.status] !== undefined) c[t.status]++; });
   return c;
 }
@@ -392,7 +404,7 @@ function counts() {
 function renderFilters() {
   var c = counts(), el = document.getElementById('filters');
   el.innerHTML = '';
-  ['all','running','completed','failed'].forEach(function(f) {
+  ['all','running','completed','failed','cancelled'].forEach(function(f) {
     var b = document.createElement('button');
     b.className = 'fbtn' + (filter === f ? ' on' : '');
     b.innerHTML = f.charAt(0).toUpperCase() + f.slice(1)
@@ -431,7 +443,7 @@ function render() {
       '<td class="c-id">' + esc(t.id) + '</td>' +
       '<td class="c-label">' + esc(t.label) + '</td>' +
       '<td>' + chipHtml(t.status) + '</td>' +
-      '<td class="c-tags">' + (t.tags||[]).map(function(g){return '<span class="tag">'+esc(g)+'</span>';}).join(' ') + '</td>' +
+      '<td class="c-tags">' + tagHtml(t.tags) + '</td>' +
       '<td class="c-time" title="' + esc(t.start) + '">' +
         '<span class="rel">' + relTime(t.start) + '</span>' +
         '<span class="abs">' + localT(t.start) + '</span></td>' +
@@ -461,7 +473,7 @@ function openModal(t) {
   modalTaskId = t.id;
   var rows = [
     ['Status',   chipHtml(t.status)],
-    ['Tags',     (t.tags||[]).map(function(g){return '<span class="tag">'+esc(g)+'</span>';}).join(' ') || '\u2014'],
+    ['Tags',     tagHtml(t.tags) || '\u2014'],
     ['ID',       '<span class="mono">' + esc(t.id) + '</span>'],
     ['Started',  fullLocal(t.start) +
       ' <span style="color:#484f58">(' + esc(t.start) + ')</span>'],

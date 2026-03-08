@@ -21,6 +21,8 @@ python3 tools/wakebridge.py \
 | `--emit-start` | off | Also emit a `WB_START` system event |
 | `--tail-lines` | 12 | Number of tail lines included in exit event |
 | `--no-taskboard` | off | Skip TaskBoard registration |
+| `--timeout-sec` | *(none)* | Kill process after N seconds, mark as timed-out (exit 124) |
+| `--no-system-alarm` | off | Skip automatic system-alarm for long tasks |
 
 ## Background execution
 
@@ -51,7 +53,22 @@ To disable: pass `--no-taskboard`.
 
 View tasks: `python3 tools/taskboard.py list` or `python3 tools/taskboard.py serve`.
 
+## Timeout
+
+When `--timeout-sec N` is set, the process is killed after N seconds and marked as failed with a `TIMEOUT` status message. Exit code is set to 124.
+
+## System-alarm (automatic)
+
+When `--timeout-sec > 20` and the task is not itself an alarm (no `alarm` or `system-alarm` tag), WakeBridge automatically creates a paired alarm task:
+
+- Tagged `system-alarm,parent:<task_id>`
+- Fires `WB_ALARM` system event at timeout+10s if main task hasn't finished
+- Auto-cancelled (status=`cancelled`) when main task finishes early
+
+Disable with `--no-system-alarm`.
+
 ## Events emitted
 
 - `WB_START`: label, timestamp, command (only with `--emit-start`)
-- `WB_DONE`: label, status (SUCCESS/FAILED), exit code, duration, command, tail output
+- `WB_DONE`: label, status (SUCCESS/FAILED/TIMEOUT), exit code, duration, command, tail output
+- `WB_ALARM`: parent task ID, label (only from system-alarm when task may be stuck)

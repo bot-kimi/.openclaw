@@ -8,7 +8,7 @@ Tasks stored at `.openclaw/taskboard/tasks.json` (created automatically).
 
 Each task has: `id`, `label`, `cmd`, `status`, `start`, `end`, `duration`, `exitCode`, `lastOutput`.
 
-Status values: `running`, `completed`, `failed`.
+Status values: `running`, `completed`, `failed`, `cancelled`.
 
 ## Commands
 
@@ -63,6 +63,14 @@ The dashboard auto-refreshes every 5 seconds and shows all tasks in a refined ta
   - raw ISO timestamps + localized timestamps
   - duration + exit code
 
+## Tag types
+
+- `alarm` — manual alarm tasks (gold chip in UI)
+- `system-alarm` — auto-created by WakeBridge for long tasks (purple chip in UI)
+- `parent:<id>` — links a system-alarm to its parent task
+
 ## Integration
 
 WakeBridge automatically registers tasks on the board (see `WAKEBRIDGE.md`). Use `--no-taskboard` on wakebridge to skip registration.
+
+When `--timeout-sec > 20`, WakeBridge also creates a paired `system-alarm` task that auto-cancels when the main task finishes.
