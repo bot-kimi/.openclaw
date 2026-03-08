@@ -126,6 +126,13 @@ def main() -> int:
         and args.timeout_sec > 20
     )
 
+    # Immediate warning when starting a non-alarm task without system-alarm protection
+    if not args.no_taskboard and not is_alarm_task and not should_alarm:
+        run_system_event(
+            f"WB_WARN label={args.label} reason=missing_system_alarm "
+            f"hint='set --timeout-sec > 20 or run a paired alarm task'"
+        )
+
     if should_alarm:
         alarm_id = uuid.uuid4().hex[:8]
         alarm_delay = args.timeout_sec + 10
