@@ -47,8 +47,10 @@ tools/runlong.sh "sleep 30; echo alarm fired" "alarm-30s-test"
 目的：主动回看状态，避免漏跟进。
 
 ```bash
-tools/runlong.sh "sleep 60; echo check long task" "alarm-check-60s"
+tools/runlong.sh "sleep 60; echo check long task" "alarm-check-60s" "alarm"
 ```
+
+> 约定：所有闹钟任务都加 `alarm` tag，便于在 TaskBoard 里统一过滤/清理。
 
 ### Step 3) 状态回报规范
 
