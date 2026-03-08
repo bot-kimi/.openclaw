@@ -66,6 +66,41 @@ tools/runlong.sh "sleep 60; echo check long task" "alarm-check-60s"
 
 ---
 
+## 标签约定（Tags Convention）
+
+TaskBoard 支持任务标签，用于分类过滤和互斥控制。
+
+### 标签格式
+
+- `vm:<name>` — 任务目标 VM（如 `vm:kimi-tpu-v5p64-auto-2048`）
+- `op:<operation>` — 操作类型（如 `op:init`, `op:train`, `op:healthcheck`）
+- 自由标签 — 任意字符串（如 `urgent`, `batch-3`）
+
+### 使用方式
+
+- **WakeBridge**：`--tags "vm:myvm,op:init"`
+- **tpu_runlong.sh**：自动生成 `vm:<name>,op:init`
+- **CLI 查询**：`python3 tools/taskboard.py list --tag vm:myvm`
+- **API**：`/api/tasks?tag=vm:myvm`
+- **UI**：下拉框按标签过滤
+
+### 互斥规则
+
+`tools/tpu_runlong.sh` 通过 `check-mutex` 实现 VM 级别互斥：
+
+- 同一 VM 同时只允许一个 `op:init` 任务运行
+- 不同 VM 可以并行（如 vm:A + vm:B 同时 init 没问题）
+- 判定方式：检查是否有 running 任务同时持有所有指定标签
+
+### 清理
+
+```bash
+# 标记所有超过 1 小时仍 running 的任务为 failed
+python3 tools/taskboard.py cleanup --max-age 3600
+```
+
+---
+
 ## 自检清单（执行前/后）
 
 执行前：

@@ -30,7 +30,8 @@ def _ensure_dir() -> None:
 def _load() -> list[dict[str, Any]]:
     if not TASKS_FILE.exists():
         return []
-    return json.loads(TASKS_FILE.read_text())
+    tasks = json.loads(TASKS_FILE.read_text())
+    return [_normalize_task(t) for t in tasks]
 
 
 def _save(tasks: list[dict[str, Any]]) -> None:
@@ -40,6 +41,27 @@ def _save(tasks: list[dict[str, Any]]) -> None:
 
 def _now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def _parse_tags(raw: str | None) -> list[str]:
+    if raw is None:
+        return []
+    out: list[str] = []
+    for part in raw.split(","):
+        tag = part.strip()
+        if tag and tag not in out:
+            out.append(tag)
+    return out
+
+
+def _normalize_task(task: dict[str, Any]) -> dict[str, Any]:
+    tags = task.get("tags")
+    if isinstance(tags, list):
+        norm_tags = [str(t).strip() for t in tags if str(t).strip()]
+        task["tags"] = list(dict.fromkeys(norm_tags))
+    else:
+        task["tags"] = []
+    return task
 
 
 # ── commands ────────────────────────────────────────────────────────
@@ -58,6 +80,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         "exitCode": None,
         "lastOutput": args.output or "",
         "logFile": args.log_file or "",
+        "tags": _parse_tags(args.tags),
     }
     tasks.append(task)
     _save(tasks)
@@ -82,6 +105,8 @@ def cmd_update(args: argparse.Namespace) -> int:
         t["exitCode"] = args.exit_code
     if args.output is not None:
         t["lastOutput"] = args.output
+    if getattr(args, "tags", None) is not None:
+        t["tags"] = _parse_tags(args.tags)
     _save(tasks)
     return 0
 
@@ -90,12 +115,61 @@ def cmd_list(args: argparse.Namespace) -> int:
     tasks = _load()
     if args.status:
         tasks = [t for t in tasks if t["status"] == args.status]
+    if args.tag:
+        tasks = [t for t in tasks if args.tag in (t.get("tags") or [])]
     if args.json_out:
         print(json.dumps(tasks, indent=2, ensure_ascii=False))
     else:
         for t in tasks:
-            dur = t.get("duration") if t.get("duration") is not None else ""
-            print(f'{t["id"]:>10}  {t["status"]:<10}  {dur:>6}s  {t["label"]}')
+            dur_v = t.get("duration")
+            dur_s = f"{dur_v:>6}s" if dur_v is not None else "     —"
+            tags_str = ",".join(t.get("tags") or [])
+            extra = f"  [{tags_str}]" if tags_str else ""
+            print(f'{t["id"]:>10}  {t["status"]:<10}  {dur_s}  {t["label"]}{extra}')
+    return 0
+
+
+def cmd_cleanup(args: argparse.Namespace) -> int:
+    tasks = _load()
+    now = dt.datetime.now(dt.timezone.utc)
+    max_age = args.max_age
+    changed = 0
+    for t in tasks:
+        if t["status"] != "running":
+            continue
+        start = t.get("start")
+        if not start:
+            continue
+        try:
+            started = dt.datetime.fromisoformat(start)
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=dt.timezone.utc)
+            elapsed = (now - started).total_seconds()
+        except (ValueError, TypeError):
+            continue
+        if elapsed > max_age:
+            t["status"] = "failed"
+            t["end"] = _now_iso()
+            t["lastOutput"] = f"stale-cleanup: running {int(elapsed)}s > {max_age}s limit"
+            changed += 1
+    if changed:
+        _save(tasks)
+    print(f"cleaned {changed} stale tasks")
+    return 0
+
+
+def cmd_check_mutex(args: argparse.Namespace) -> int:
+    required = _parse_tags(args.tags)
+    if not required:
+        return 0
+    tasks = _load()
+    for t in tasks:
+        if t["status"] != "running":
+            continue
+        task_tags = t.get("tags") or []
+        if all(tag in task_tags for tag in required):
+            sys.stderr.write(f"BLOCKED by {t['id']} ({t['label']}): tags {task_tags}\n")
+            return 1
     return 0
 
 
@@ -161,6 +235,7 @@ td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
   font-family:'SF Mono',SFMono-Regular,Consolas,monospace;
 }
 .c-dur,.c-exit{text-align:right;font-family:monospace;font-size:12px;color:#8b949e}
+.c-tags{max-width:220px;overflow:hidden;text-overflow:ellipsis;color:#8b949e;font-size:12px}
 .c-time{font-size:12px;color:#8b949e}
 .c-time .rel{color:#c9d1d9;font-weight:500}
 .c-time .abs{color:#484f58;font-size:11px;margin-left:6px}
@@ -173,6 +248,11 @@ td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
 .chip-running{background:rgba(56,139,253,.15);color:#58a6ff}
 .chip-completed{background:rgba(63,185,80,.15);color:#3fb950}
 .chip-failed{background:rgba(248,81,73,.15);color:#f85149}
+.tag{
+  display:inline-block;padding:0 6px;border-radius:6px;
+  font-size:10px;background:rgba(139,148,158,.15);color:#8b949e;
+  margin-right:3px;white-space:nowrap;
+}
 
 /* ── empty state ── */
 .empty{text-align:center;padding:48px 0;color:#484f58;font-size:14px}
@@ -228,9 +308,10 @@ td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
     <span class="meta" id="meta"></span>
   </div>
   <div class="filters" id="filters"></div>
+  <div class="filters"><select id="tagFilter" class="fbtn" style="padding:4px 10px;border-radius:8px"></select></div>
   <table>
     <thead><tr>
-      <th>ID</th><th>Label</th><th>Status</th>
+      <th>ID</th><th>Label</th><th>Status</th><th>Tags</th>
       <th>Started</th><th>Duration</th><th>Exit</th><th>Command</th>
     </tr></thead>
     <tbody id="tb"></tbody>
@@ -252,6 +333,7 @@ td{padding:7px 12px;white-space:nowrap;vertical-align:middle}
 (function(){
 var T = __TASKS_JSON__;
 var filter = 'all';
+var tagFilter = 'all';
 
 function esc(s) {
   if (s == null) return '';
@@ -320,9 +402,22 @@ function renderFilters() {
   });
 }
 
+function renderTagFilter() {
+  var sel = document.getElementById('tagFilter');
+  var tags = {};
+  T.forEach(function(t) { (t.tags||[]).forEach(function(g) { tags[g] = (tags[g]||0)+1; }); });
+  var keys = Object.keys(tags).sort();
+  var html = '<option value="all">All tags</option>';
+  keys.forEach(function(k) { html += '<option value="'+esc(k)+'"'+(tagFilter===k?' selected':'')+'>'+esc(k)+' ('+tags[k]+')</option>'; });
+  sel.innerHTML = html;
+  sel.onchange = function() { tagFilter = sel.value; render(); };
+}
+
 function render() {
   renderFilters();
+  renderTagFilter();
   var list = filter === 'all' ? T.slice() : T.filter(function(t) { return t.status === filter; });
+  if (tagFilter !== 'all') list = list.filter(function(t) { return (t.tags||[]).indexOf(tagFilter) >= 0; });
   list.sort(function(a, b) { return (b.start || '').localeCompare(a.start || ''); });
   document.getElementById('meta').textContent =
     list.length + ' of ' + T.length + ' tasks \u00b7 live';
@@ -336,6 +431,7 @@ function render() {
       '<td class="c-id">' + esc(t.id) + '</td>' +
       '<td class="c-label">' + esc(t.label) + '</td>' +
       '<td>' + chipHtml(t.status) + '</td>' +
+      '<td class="c-tags">' + (t.tags||[]).map(function(g){return '<span class="tag">'+esc(g)+'</span>';}).join(' ') + '</td>' +
       '<td class="c-time" title="' + esc(t.start) + '">' +
         '<span class="rel">' + relTime(t.start) + '</span>' +
         '<span class="abs">' + localT(t.start) + '</span></td>' +
@@ -365,6 +461,7 @@ function openModal(t) {
   modalTaskId = t.id;
   var rows = [
     ['Status',   chipHtml(t.status)],
+    ['Tags',     (t.tags||[]).map(function(g){return '<span class="tag">'+esc(g)+'</span>';}).join(' ') || '\u2014'],
     ['ID',       '<span class="mono">' + esc(t.id) + '</span>'],
     ['Started',  fullLocal(t.start) +
       ' <span style="color:#484f58">(' + esc(t.start) + ')</span>'],
@@ -424,6 +521,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
             tasks = _load()
             parsed = urlparse(self.path)
             if parsed.path == "/api/tasks":
+                q = parse_qs(parsed.query)
+                tag = (q.get("tag") or [""])[0].strip()
+                if tag:
+                    tasks = [t for t in tasks if tag in (t.get("tags") or [])]
                 body = json.dumps(tasks, ensure_ascii=False).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -483,6 +584,7 @@ def main() -> int:
     p_add.add_argument("--start", default=None)
     p_add.add_argument("--output", default="")
     p_add.add_argument("--log-file", default="")
+    p_add.add_argument("--tags", default="")
 
     p_upd = sub.add_parser("update", help="Update an existing task")
     p_upd.add_argument("--id", required=True)
@@ -491,21 +593,32 @@ def main() -> int:
     p_upd.add_argument("--duration", type=int, default=None)
     p_upd.add_argument("--exit-code", type=int, default=None)
     p_upd.add_argument("--output", default=None)
+    p_upd.add_argument("--tags", default=None)
 
     p_ls = sub.add_parser("list", help="List tasks")
     p_ls.add_argument("--status", default=None)
+    p_ls.add_argument("--tag", default=None)
     p_ls.add_argument("--json", dest="json_out", action="store_true")
 
     p_srv = sub.add_parser("serve", help="Start HTTP dashboard")
     p_srv.add_argument("--host", default="0.0.0.0")
     p_srv.add_argument("--port", type=int, default=9876)
 
+    p_clean = sub.add_parser("cleanup", help="Mark stale running tasks as failed")
+    p_clean.add_argument("--max-age", type=int, default=3600,
+                         help="Seconds before a running task is considered stale")
+
+    p_mut = sub.add_parser("check-mutex", help="Exit non-zero if a running task matches all given tags")
+    p_mut.add_argument("--tags", required=True, help="Comma-separated tags to check")
+
     args = ap.parse_args()
     if not args.command:
         ap.print_help()
         return 1
 
-    return {"add": cmd_add, "update": cmd_update, "list": cmd_list, "serve": cmd_serve}[args.command](args)
+    cmds = {"add": cmd_add, "update": cmd_update, "list": cmd_list,
+            "serve": cmd_serve, "cleanup": cmd_cleanup, "check-mutex": cmd_check_mutex}
+    return cmds[args.command](args)
 
 
 if __name__ == "__main__":

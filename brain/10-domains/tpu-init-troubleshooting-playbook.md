@@ -9,9 +9,10 @@ Last updated: 2026-03-08 UTC
 1. 长任务必须走 `tools/runlong.sh`（WakeBridge），不能前台卡住。
 2. 远程 TPU 默认按 **multi-host** 处理，命令必须带 `--worker=all`。
 3. 同一张卡同一时刻只允许一个 `jax.devices()` 初始化进程（避免互斥冲突）。
-4. TPU 长任务统一走 `tools/tpu_runlong.sh`（自带“已有 TPU 运行任务则阻塞”保护）。
-5. 每轮结束后检查并清理 TaskBoard 的 stale running 条目，保持面板与真实进程一致。
-4. 发现卡被 preempted/连接层异常时，优先 `delete + reapply`，不要死磕旧卡。
+4. TPU 长任务统一走 `tools/tpu_runlong.sh '<cmd>' '<label>' '<vm-name>'`。
+   - 使用标签 `vm:<name>,op:init` 实现 **VM 级别互斥**（同 VM 阻塞，不同 VM 放行）。
+5. 每轮结束后运行 `python3 tools/taskboard.py cleanup --max-age 3600` 清理 stale running 条目。
+6. 发现卡被 preempted/连接层异常时，优先 `delete + reapply`，不要死磕旧卡。
 
 ## 常见错误信号与含义
 
@@ -52,8 +53,13 @@ Last updated: 2026-03-08 UTC
 ## 推荐执行模板（后台）
 
 ```bash
-tools/runlong.sh "./wiki_tpu/kimi_tpu.sh ssh <vm-name> --worker=all --command 'python3 -m pip install --user \"jax[tpu]==0.4.37\" jaxlib -f https://storage.googleapis.com/jax-releases/libtpu_releases.html && sudo rm -rf /tmp/*tpu* /tmp/tpu_logs/* 2>/dev/null || true && timeout 240s python3 -c \"import jax; print(jax.__version__); print(jax.devices())\"'" "tpu-<type>-init"
+tools/tpu_runlong.sh \
+  "./wiki_tpu/kimi_tpu.sh ssh <vm-name> --worker=all --command 'python3 -m pip install --user \"jax[tpu]==0.4.37\" jaxlib -f https://storage.googleapis.com/jax-releases/libtpu_releases.html && sudo rm -rf /tmp/*tpu* /tmp/tpu_logs/* 2>/dev/null || true && timeout 240s python3 -c \"import jax; print(jax.__version__); print(jax.devices())\"'" \
+  "tpu-<type>-init" \
+  "<vm-name>"
 ```
+
+自动标签 `vm:<vm-name>,op:init`；同 VM 会被互斥阻塞，不同 VM 并行放行。
 
 ## 本次实战结论（2026-03-08）
 - 旧卡多次出现 worker join / ssh 255 等连接层问题，继续重试收益低。

@@ -36,17 +36,20 @@ def _taskboard_running() -> bool:
         return False
 
 
-def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str, log_file: str) -> None:
+def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str,
+                   log_file: str, tags: str | None = None) -> None:
     if not TASKBOARD_PY.exists():
         return
     try:
-        subprocess.run(
-            [sys.executable, str(TASKBOARD_PY), "add",
-             "--id", task_id, "--label", label, "--cmd", cmd_str,
-             "--status", "running", "--start", start_iso,
-             "--log-file", log_file],
-            capture_output=True, text=True,
-        )
+        cmd = [sys.executable, str(TASKBOARD_PY), "add",
+               "--id", task_id, "--label", label, "--cmd", cmd_str,
+               "--status", "running", "--start", start_iso,
+               "--log-file", log_file]
+        if tags:
+            cmd += ["--tags", tags]
+        p = subprocess.run(cmd, capture_output=True, text=True)
+        if p.returncode != 0:
+            sys.stderr.write(f"[wakebridge] taskboard add rc={p.returncode}: {p.stderr}\n")
     except Exception as exc:
         sys.stderr.write(f"[wakebridge] taskboard add failed: {exc}\n")
 
@@ -74,6 +77,7 @@ def main() -> int:
     ap.add_argument("--cwd", default=None, help="Working directory")
     ap.add_argument("--emit-start", action="store_true", help="Also emit start event")
     ap.add_argument("--tail-lines", type=int, default=12, help="Tail lines in exit event")
+    ap.add_argument("--tags", default=None, help="Comma-separated tags for taskboard")
     ap.add_argument("--no-taskboard", action="store_true", help="Skip taskboard registration")
     args = ap.parse_args()
 
@@ -99,7 +103,7 @@ def main() -> int:
         )
 
     if not args.no_taskboard:
-        _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path))
+        _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path), args.tags)
 
     proc = subprocess.Popen(
         args.cmd,

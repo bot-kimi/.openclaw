@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -lt 2 ]]; then
-  echo "Usage: tools/tpu_runlong.sh '<command>' '<label>'"
+if [[ $# -lt 3 ]]; then
+  echo "Usage: tools/tpu_runlong.sh '<command>' '<label>' '<vm-name>'"
+  echo ""
+  echo "VM-level mutex: blocks only when the same vm:<name> already has"
+  echo "an op:init task running.  Different VMs run concurrently."
   exit 1
 fi
 
 CMD="$1"
 LABEL="$2"
-TASKS_JSON="/home/jasm/.openclaw/workspace/.openclaw/taskboard/tasks.json"
+VM="$3"
+TAGS="vm:${VM},op:init"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-python3 - <<'PY'
-import json, sys
-from pathlib import Path
-p=Path('/home/jasm/.openclaw/workspace/.openclaw/taskboard/tasks.json')
-if not p.exists():
-    sys.exit(0)
-arr=json.loads(p.read_text())
-r=[t for t in arr if t.get('status')=='running' and str(t.get('label','')).startswith('tpu-')]
-if r:
-    print('BLOCKED: running TPU tasks exist:')
-    for t in r:
-        print(f"- {t.get('id')} {t.get('label')}")
-    sys.exit(42)
-PY
+# VM-level mutex check via taskboard tags
+if ! python3 "${SCRIPT_DIR}/taskboard.py" check-mutex --tags "$TAGS"; then
+  echo "BLOCKED: a running task already holds tags [$TAGS]"
+  exit 42
+fi
 
-exec /home/jasm/.openclaw/workspace/tools/runlong.sh "$CMD" "$LABEL"
+exec python3 "${SCRIPT_DIR}/wakebridge.py" \
+  --cmd "$CMD" \
+  --label "$LABEL" \
+  --cwd "$(pwd)" \
+  --emit-start \
+  --tags "$TAGS"
