@@ -15,6 +15,8 @@ related: []
 
 ## Active Projects
 - `qmd-memory-system/` — hierarchical memory architecture and reflection automation
+- `coding-session-router/` — non-trivial coding task routing with resumable agent sessions
+- `hh-onboarding/` — onboarding memory for general practice, compute, storage, and operational rules
 
 Create one folder per project/task:
 

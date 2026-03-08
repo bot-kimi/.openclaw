@@ -45,3 +45,14 @@ tags: [onboarding, hierarchy, general-practice, compute, storage, other]
 ### B. Tooling / collaboration conventions
 - `skills/kimi-tpu` is single-purpose for `kimi_tpu.sh` workflows.
 - Keep TPU operation, storage policy, and experiment policy as separate modules/notes.
+
+## 5) Lessons & Patterns
+
+- Prefer explicit semantic labels over generic labels: `staging` is a reproducibility snapshot archive, not a throwaway scratch area.
+- Verbal confirmation is not enough; retrieval should be tested (`can I query it back?`) to verify memory durability.
+- For infra operations, distinguish immutable hard constraints (safety/survival) from advisory heuristics (efficiency/cost).
+
+## 6) Open Loops
+
+- Continue onboarding in next session (post-storage/other continuation from HH).
+- Build a compact TPU intuition cheat sheet for faster planning decisions.
