@@ -9,6 +9,8 @@ Last updated: 2026-03-08 UTC
 1. 长任务必须走 `tools/runlong.sh`（WakeBridge），不能前台卡住。
 2. 远程 TPU 默认按 **multi-host** 处理，命令必须带 `--worker=all`。
 3. 同一张卡同一时刻只允许一个 `jax.devices()` 初始化进程（避免互斥冲突）。
+4. TPU 长任务统一走 `tools/tpu_runlong.sh`（自带“已有 TPU 运行任务则阻塞”保护）。
+5. 每轮结束后检查并清理 TaskBoard 的 stale running 条目，保持面板与真实进程一致。
 4. 发现卡被 preempted/连接层异常时，优先 `delete + reapply`，不要死磕旧卡。
 
 ## 常见错误信号与含义
