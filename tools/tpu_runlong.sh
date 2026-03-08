@@ -2,16 +2,17 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: tools/tpu_runlong.sh '<command>' '<label>' '<vm-name>'"
+  echo "Usage: tools/tpu_runlong.sh '<command>' '<label>' '<vm-name>' [timeout-sec]"
   echo ""
   echo "VM-level mutex: blocks only when the same vm:<name> already has"
-  echo "an op:init task running.  Different VMs run concurrently."
+  echo "an op:init task running. Different VMs run concurrently."
   exit 1
 fi
 
 CMD="$1"
 LABEL="$2"
 VM="$3"
+TIMEOUT_SEC="${4:-240}"
 TAGS="vm:${VM},op:init"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -26,4 +27,5 @@ exec python3 "${SCRIPT_DIR}/wakebridge.py" \
   --label "$LABEL" \
   --cwd "$(pwd)" \
   --emit-start \
-  --tags "$TAGS"
+  --tags "$TAGS" \
+  --timeout-sec "$TIMEOUT_SEC"
