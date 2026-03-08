@@ -16,7 +16,7 @@ _Learn about the person you're helping. Update this as you go._
   - Daily report language preference: content posted to Notion should be in Chinese (2026-03-05 UTC)
   - Coding workflow preference: for non-trivial coding tasks, always use the `coding-session-router` skill (cursor-agent for quick tasks, opencode for long-lived resumable sessions) (2026-03-05 UTC)
   - Git workflow preference: after every git commit, always push (2026-03-05 UTC)
-  - Long-running command workflow preference: use WakeBridge/`tools/runlong.sh` to ensure start/end (including failure) notifications in-session (2026-03-07 UTC)
+  - Long-running command workflow HARD rule: “后台执行” means using WakeBridge/`tools/runlong.sh` (not plain background exec), to ensure start/end/failure notifications in-session (2026-03-07 UTC; reinforced 2026-03-08 UTC)
   - Coding workflow stability preference: when using coding skills/agents, always run agent in background and rely on completion wake-up; never block the main chat turn with foreground coding runs (2026-03-07 UTC)
   - Infra workflow reminder: for private/org GitHub repos, clone via SSH (`git@github.com:owner/repo.git`) using existing SSH key; do not default to HTTPS (2026-03-07 UTC)
   - Experiment tracking preference: sync all experiment records to Google Sheets master file `general` (ID: `1vsic-xRGf6uzWJ58SUGNEE116FnInfAiWKePLj0bA34`); use sub-sheets/tabs for specific experiment tracks (2026-03-07 UTC)
