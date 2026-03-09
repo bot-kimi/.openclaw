@@ -281,6 +281,10 @@ def main() -> int:
         f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
         f"cmd={args.cmd} log={log_path} tail={compact_tail}"
     )
+    if (args.notify_channel or "").strip().lower() == "telegram":
+        done_text += (
+            " hint=注意，这是telegram的信息，你必须用notify_telegram.sh把回复发送到telegram里，在这里回复无效"
+        )
     run_system_event(done_text)
     if notify_enabled:
         send_openclaw_message(args.notify_channel, args.notify_target, done_text)
