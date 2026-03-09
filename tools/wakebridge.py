@@ -24,7 +24,19 @@ TASKBOARD_URL = "http://127.0.0.1:9876/api/tasks"
 TASKBOARD_LOG_DIR = TOOLS_DIR.parent / ".openclaw" / "taskboard" / "logs"
 
 
-def run_system_event(text: str, mode: str = "now") -> None:
+TELEGRAM_HINT = "hint=注意，这是telegram的信息，你必须用notify_telegram.sh把回复发送到telegram里，在这里回复无效"
+
+
+def _append_telegram_hint(text: str, force_hint: bool) -> str:
+    if not force_hint:
+        return text
+    if "hint=" in text:
+        return text
+    return f"{text} {TELEGRAM_HINT}"
+
+
+def run_system_event(text: str, mode: str = "now", force_hint: bool = False) -> None:
+    text = _append_telegram_hint(text, force_hint)
     cmd = ["openclaw", "system", "event", "--mode", mode, "--text", text]
     p = subprocess.run(cmd, text=True, capture_output=True)
     if p.returncode != 0:
@@ -125,19 +137,24 @@ def main() -> int:
     log_path.write_text("", encoding="utf-8")
 
     notify_enabled = bool(args.notify_channel and args.notify_target)
+    telegram_context = (
+        (os.environ.get("OPENCLAW_CHANNEL", "").strip().lower() == "telegram")
+        or ((args.notify_channel or "").strip().lower() == "telegram")
+    )
 
     if not args.no_taskboard and not _taskboard_running():
         msg = (
             "WB_ERROR reason=taskboard_down "
             f"label={args.label} hint='start taskboard: python3 tools/taskboard.py serve --host 0.0.0.0 --port 9876'"
         )
-        run_system_event(msg)
+        run_system_event(msg, force_hint=telegram_context)
         sys.stderr.write("[wakebridge] TaskBoard is not running on :9876; refusing long task.\n")
         return 97
 
     if args.emit_start:
         run_system_event(
-            f"WB_START label={args.label} ts={start_iso} cmd={args.cmd}"
+            f"WB_START label={args.label} ts={start_iso} cmd={args.cmd}",
+            force_hint=telegram_context,
         )
         if notify_enabled:
             send_openclaw_message(
@@ -172,7 +189,8 @@ def main() -> int:
     if not args.no_taskboard and not is_alarm_task and not should_alarm:
         run_system_event(
             f"WB_WARN label={args.label} reason=missing_system_alarm "
-            f"hint='set --alarm-after-sec > 0 (first-check) or run a paired alarm task'"
+            f"hint='set --alarm-after-sec > 0 (first-check) or run a paired alarm task'",
+            force_hint=telegram_context,
         )
 
     if should_alarm:
@@ -206,7 +224,7 @@ def main() -> int:
                     f"WB_ALARM parent={_atid} label={_albl} "
                     f"msg=System alarm fired — task may need attention"
                 )
-                run_system_event(alarm_text)
+                run_system_event(alarm_text, force_hint=telegram_context)
                 if notify_enabled:
                     send_openclaw_message(args.notify_channel, args.notify_target, alarm_text)
 
@@ -281,11 +299,7 @@ def main() -> int:
         f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
         f"cmd={args.cmd} log={log_path} tail={compact_tail}"
     )
-    if (args.notify_channel or "").strip().lower() == "telegram":
-        done_text += (
-            " hint=注意，这是telegram的信息，你必须用notify_telegram.sh把回复发送到telegram里，在这里回复无效"
-        )
-    run_system_event(done_text)
+    run_system_event(done_text, force_hint=telegram_context)
     if notify_enabled:
         send_openclaw_message(args.notify_channel, args.notify_target, done_text)
 
