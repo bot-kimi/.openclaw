@@ -23,6 +23,8 @@ python3 tools/wakebridge.py \
 | `--no-taskboard` | off | Skip TaskBoard registration |
 | `--timeout-sec` | *(none)* | Kill process after N seconds, mark as timed-out (exit 124) |
 | `--no-system-alarm` | off | Skip automatic system-alarm for long tasks |
+| `--notify-channel` | *(none)* | Also send WB_START/WB_DONE/WB_ALARM as direct channel message |
+| `--notify-target` | *(none)* | Direct message target, e.g. `telegram:8204583385` |
 
 ## Background execution
 
@@ -41,6 +43,12 @@ tools/runlong.sh 'bash ./command.sh' 'command.sh'
 ```
 
 Automatically sets `--cwd` to current directory and enables `--emit-start`.
+
+If you need guaranteed in-chat notifications for a specific thread/chat, pass channel+target:
+
+```bash
+tools/runlong.sh 'bash ./command.sh' 'command.sh' '' '' '120' 'telegram' 'telegram:8204583385'
+```
 
 ## TaskBoard integration
 

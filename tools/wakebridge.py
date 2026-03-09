@@ -31,6 +31,18 @@ def run_system_event(text: str, mode: str = "now") -> None:
         sys.stderr.write(f"[wakebridge] system event failed rc={p.returncode}: {p.stderr}\n")
 
 
+def send_openclaw_message(channel: str, target: str, text: str) -> None:
+    cmd = [
+        "openclaw", "message", "send",
+        "--channel", channel,
+        "--target", target,
+        "--message", text,
+    ]
+    p = subprocess.run(cmd, text=True, capture_output=True)
+    if p.returncode != 0:
+        sys.stderr.write(f"[wakebridge] message send failed rc={p.returncode}: {p.stderr}\n")
+
+
 def _taskboard_running() -> bool:
     try:
         with urllib.request.urlopen(TASKBOARD_URL, timeout=1.2) as resp:
@@ -99,6 +111,10 @@ def main() -> int:
                     help="Fire first-check system alarm after N seconds (does not kill task)")
     ap.add_argument("--no-system-alarm", action="store_true",
                     help="Skip automatic system-alarm for long tasks")
+    ap.add_argument("--notify-channel", default=None,
+                    help="Direct message channel for start/done/alarm notifications (e.g. telegram)")
+    ap.add_argument("--notify-target", default=None,
+                    help="Direct message target (e.g. telegram:8204583385)")
     args = ap.parse_args()
 
     task_id = uuid.uuid4().hex[:8]
@@ -107,6 +123,8 @@ def main() -> int:
     TASKBOARD_LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_path = TASKBOARD_LOG_DIR / f"{task_id}.log"
     log_path.write_text("", encoding="utf-8")
+
+    notify_enabled = bool(args.notify_channel and args.notify_target)
 
     if not args.no_taskboard and not _taskboard_running():
         msg = (
@@ -121,6 +139,12 @@ def main() -> int:
         run_system_event(
             f"WB_START label={args.label} ts={start_iso} cmd={args.cmd}"
         )
+        if notify_enabled:
+            send_openclaw_message(
+                args.notify_channel,
+                args.notify_target,
+                f"WB_START label={args.label} ts={start_iso} cmd={args.cmd}",
+            )
 
 
     # ── System-alarm setup ──────────────────────────────────────────
@@ -178,10 +202,13 @@ def main() -> int:
                 dur = int((end - dt.datetime.fromisoformat(_aiso)).total_seconds())
                 _taskboard_update(_aid, "completed", end_iso, dur, 0,
                                   f"system-alarm fired for {_atid}")
-                run_system_event(
+                alarm_text = (
                     f"WB_ALARM parent={_atid} label={_albl} "
                     f"msg=System alarm fired — task may need attention"
                 )
+                run_system_event(alarm_text)
+                if notify_enabled:
+                    send_openclaw_message(args.notify_channel, args.notify_target, alarm_text)
 
         threading.Thread(target=_alarm_watcher, daemon=True).start()
 
@@ -250,10 +277,13 @@ def main() -> int:
 
     status = "TIMEOUT" if timed_out else ("SUCCESS" if code == 0 else "FAILED")
     compact_tail = tail_block.replace("\n", "\\n")
-    run_system_event(
+    done_text = (
         f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
         f"cmd={args.cmd} log={log_path} tail={compact_tail}"
     )
+    run_system_event(done_text)
+    if notify_enabled:
+        send_openclaw_message(args.notify_channel, args.notify_target, done_text)
 
     if not args.no_taskboard:
         tb_status = "completed" if code == 0 and not timed_out else "failed"
