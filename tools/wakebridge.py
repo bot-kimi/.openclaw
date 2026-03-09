@@ -41,7 +41,9 @@ def _taskboard_running() -> bool:
 
 def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str,
                    log_file: str, tags: str | None = None,
-                   pid: int | None = None, pgid: int | None = None) -> None:
+                   pid: int | None = None, pgid: int | None = None,
+                   timeout_sec: int | None = None,
+                   alarm_after_sec: int | None = None) -> None:
     if not TASKBOARD_PY.exists():
         return
     try:
@@ -55,6 +57,10 @@ def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str,
             cmd += ["--pid", str(pid)]
         if pgid is not None:
             cmd += ["--pgid", str(pgid)]
+        if timeout_sec is not None:
+            cmd += ["--timeout-sec", str(timeout_sec)]
+        if alarm_after_sec is not None:
+            cmd += ["--alarm-after-sec", str(alarm_after_sec)]
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode != 0:
             sys.stderr.write(f"[wakebridge] taskboard add rc={p.returncode}: {p.stderr}\n")
@@ -154,7 +160,8 @@ def main() -> int:
         alarm_log = TASKBOARD_LOG_DIR / f"{alarm_id}.log"
         alarm_log.write_text("", encoding="utf-8")
         _taskboard_add(alarm_id, alarm_label, f"sleep {alarm_delay}",
-                       alarm_start_iso, str(alarm_log), alarm_tags_str)
+                       alarm_start_iso, str(alarm_log), alarm_tags_str,
+                       timeout_sec=alarm_delay, alarm_after_sec=alarm_delay)
         alarm_proc = subprocess.Popen(
             f"sleep {alarm_delay}", shell=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -198,7 +205,8 @@ def main() -> int:
 
     if not args.no_taskboard:
         _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path), args.tags,
-                       pid=proc.pid, pgid=proc_pgid)
+                       pid=proc.pid, pgid=proc_pgid,
+                       timeout_sec=args.timeout_sec, alarm_after_sec=alarm_after)
 
     timed_out = False
     timeout_timer: threading.Timer | None = None

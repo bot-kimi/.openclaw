@@ -87,6 +87,8 @@ def cmd_add(args: argparse.Namespace) -> int:
         "tags": _parse_tags(args.tags),
         "pid": args.pid,
         "pgid": args.pgid,
+        "timeoutSec": args.timeout_sec,
+        "alarmAfterSec": args.alarm_after_sec,
     }
     tasks.append(task)
     _save(tasks)
@@ -117,6 +119,10 @@ def cmd_update(args: argparse.Namespace) -> int:
         t["pid"] = args.pid
     if getattr(args, "pgid", None) is not None:
         t["pgid"] = args.pgid
+    if getattr(args, "timeout_sec", None) is not None:
+        t["timeoutSec"] = args.timeout_sec
+    if getattr(args, "alarm_after_sec", None) is not None:
+        t["alarmAfterSec"] = args.alarm_after_sec
     _save(tasks)
     return 0
 
@@ -575,6 +581,8 @@ function openModal(t) {
     ['Duration', fmtDur(t.duration) +
       (t.duration != null ? ' <span style="color:#484f58">(' + t.duration + 's)</span>' : '')],
     ['Exit',     t.exitCode != null ? String(t.exitCode) : '\u2014'],
+    ['Timeout',  t.timeoutSec != null ? (String(t.timeoutSec) + 's') : '\u2014'],
+    ['First check alarm', t.alarmAfterSec != null ? (String(t.alarmAfterSec) + 's') : '\u2014'],
     ['Command',  '<span class="mono">' + esc(t.cmd || '\u2014') + '</span>'],
   ];
   var h = '<div class="m-grid">';
@@ -726,6 +734,8 @@ def main() -> int:
     p_add.add_argument("--tags", default="")
     p_add.add_argument("--pid", type=int, default=None)
     p_add.add_argument("--pgid", type=int, default=None)
+    p_add.add_argument("--timeout-sec", type=int, default=None)
+    p_add.add_argument("--alarm-after-sec", type=int, default=None)
 
     p_upd = sub.add_parser("update", help="Update an existing task")
     p_upd.add_argument("--id", required=True)
@@ -737,6 +747,8 @@ def main() -> int:
     p_upd.add_argument("--tags", default=None)
     p_upd.add_argument("--pid", type=int, default=None)
     p_upd.add_argument("--pgid", type=int, default=None)
+    p_upd.add_argument("--timeout-sec", type=int, default=None)
+    p_upd.add_argument("--alarm-after-sec", type=int, default=None)
 
     p_ls = sub.add_parser("list", help="List tasks")
     p_ls.add_argument("--status", default=None)
