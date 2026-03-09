@@ -89,6 +89,8 @@ def main() -> int:
     ap.add_argument("--no-taskboard", action="store_true", help="Skip taskboard registration")
     ap.add_argument("--timeout-sec", type=int, default=None,
                     help="Kill process after N seconds and mark as timed-out")
+    ap.add_argument("--alarm-after-sec", type=int, default=None,
+                    help="Fire first-check system alarm after N seconds (does not kill task)")
     ap.add_argument("--no-system-alarm", action="store_true",
                     help="Skip automatic system-alarm for long tasks")
     args = ap.parse_args()
@@ -123,24 +125,29 @@ def main() -> int:
 
     task_tags = [t.strip() for t in (args.tags or "").split(",") if t.strip()]
     is_alarm_task = "alarm" in task_tags or "system-alarm" in task_tags
+    alarm_after = args.alarm_after_sec
+    if alarm_after is None and args.timeout_sec is not None and args.timeout_sec > 20:
+        # Backward compatibility: if caller only set timeout, keep old behavior.
+        alarm_after = args.timeout_sec + 10
+
     should_alarm = (
         not args.no_system_alarm
         and not args.no_taskboard
         and not is_alarm_task
-        and args.timeout_sec is not None
-        and args.timeout_sec > 20
+        and alarm_after is not None
+        and alarm_after > 0
     )
 
     # Immediate warning when starting a non-alarm task without system-alarm protection
     if not args.no_taskboard and not is_alarm_task and not should_alarm:
         run_system_event(
             f"WB_WARN label={args.label} reason=missing_system_alarm "
-            f"hint='set --timeout-sec > 20 or run a paired alarm task'"
+            f"hint='set --alarm-after-sec > 0 (first-check) or run a paired alarm task'"
         )
 
     if should_alarm:
         alarm_id = uuid.uuid4().hex[:8]
-        alarm_delay = args.timeout_sec + 10
+        alarm_delay = int(alarm_after)
         alarm_label = f"sysalarm-{args.label}"
         alarm_tags_str = f"system-alarm,parent:{task_id}"
         alarm_start_iso = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
