@@ -10,6 +10,8 @@ import argparse
 import datetime as dt
 import http.server
 import json
+import os
+import signal
 import sys
 import uuid
 from pathlib import Path
@@ -80,7 +82,11 @@ def cmd_add(args: argparse.Namespace) -> int:
         "exitCode": None,
         "lastOutput": args.output or "",
         "logFile": args.log_file or "",
+        "pid": args.pid,
+        "pgid": args.pgid,
         "tags": _parse_tags(args.tags),
+        "pid": args.pid,
+        "pgid": args.pgid,
     }
     tasks.append(task)
     _save(tasks)
@@ -107,6 +113,10 @@ def cmd_update(args: argparse.Namespace) -> int:
         t["lastOutput"] = args.output
     if getattr(args, "tags", None) is not None:
         t["tags"] = _parse_tags(args.tags)
+    if getattr(args, "pid", None) is not None:
+        t["pid"] = args.pid
+    if getattr(args, "pgid", None) is not None:
+        t["pgid"] = args.pgid
     _save(tasks)
     return 0
 
@@ -170,6 +180,88 @@ def cmd_check_mutex(args: argparse.Namespace) -> int:
         if all(tag in task_tags for tag in required):
             sys.stderr.write(f"BLOCKED by {t['id']} ({t['label']}): tags {task_tags}\n")
             return 1
+    return 0
+
+
+def cmd_cancel(args: argparse.Namespace) -> int:
+    import os
+    import signal
+
+    tasks = _load()
+    found = [t for t in tasks if t["id"] == args.id]
+    if not found:
+        sys.stderr.write(f"task {args.id} not found\n")
+        return 1
+
+    t = found[0]
+    if t.get("status") != "running" and not args.force:
+        print(f"task {args.id} is not running (status={t.get('status')})")
+        return 0
+
+    killed = False
+    pgid = t.get("pgid")
+    pid = t.get("pid")
+    try:
+        if pgid:
+            os.killpg(int(pgid), signal.SIGTERM)
+            killed = True
+        elif pid:
+            os.kill(int(pid), signal.SIGTERM)
+            killed = True
+    except Exception:
+        if args.force:
+            try:
+                if pgid:
+                    os.killpg(int(pgid), signal.SIGKILL)
+                    killed = True
+                elif pid:
+                    os.kill(int(pid), signal.SIGKILL)
+                    killed = True
+            except Exception:
+                killed = False
+
+    t["status"] = "cancelled"
+    t["end"] = _now_iso()
+    t["exitCode"] = -1
+    t["lastOutput"] = "cancelled via taskboard" + ("; signal_sent" if killed else "; no_signal")
+    _save(tasks)
+    print(f"cancelled {args.id} (signal_sent={killed})")
+    return 0
+
+
+def cmd_cancel(args: argparse.Namespace) -> int:
+    tasks = _load()
+    target = next((t for t in tasks if t.get("id") == args.id), None)
+    if not target:
+        sys.stderr.write(f"task {args.id} not found\n")
+        return 1
+
+    killed = False
+    err: str | None = None
+    pgid = target.get("pgid")
+    pid = target.get("pid")
+    try:
+        if pgid is not None:
+            os.killpg(int(pgid), signal.SIGTERM)
+            killed = True
+        elif pid is not None:
+            os.kill(int(pid), signal.SIGTERM)
+            killed = True
+    except Exception as exc:
+        err = str(exc)
+
+    now = _now_iso()
+    target["status"] = "cancelled"
+    target["end"] = now
+    target["exitCode"] = -1
+    msg = "cancel requested"
+    if killed:
+        msg = "cancel requested; signal sent"
+    elif err:
+        msg = f"cancel requested; signal error: {err}"
+    target["lastOutput"] = msg
+    _save(tasks)
+    print(msg)
     return 0
 
 
@@ -543,6 +635,22 @@ def cmd_serve(args: argparse.Namespace) -> int:
                 self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 self.wfile.write(body)
+            elif parsed.path == "/api/cancel":
+                q = parse_qs(parsed.query)
+                task_id = (q.get("id") or [""])[0]
+                if not task_id:
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(b"missing id")
+                    return
+                ns = argparse.Namespace(id=task_id, force=True)
+                rc = cmd_cancel(ns)
+                body = json.dumps({"ok": rc == 0, "id": task_id}, ensure_ascii=False).encode()
+                self.send_response(200 if rc == 0 else 500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
             elif parsed.path == "/api/log":
                 q = parse_qs(parsed.query)
                 task_id = (q.get("id") or [""])[0]
@@ -569,6 +677,25 @@ def cmd_serve(args: argparse.Namespace) -> int:
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(html.encode())
+
+        def do_POST(self) -> None:
+            parsed = urlparse(self.path)
+            if parsed.path != "/api/cancel":
+                self.send_response(404)
+                self.end_headers()
+                return
+            q = parse_qs(parsed.query)
+            task_id = (q.get("id") or [""])[0].strip()
+            if not task_id:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"missing id")
+                return
+            rc = cmd_cancel(argparse.Namespace(id=task_id))
+            self.send_response(200 if rc == 0 else 500)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": rc == 0, "id": task_id}).encode("utf-8"))
 
         def log_message(self, fmt: str, *a: Any) -> None:
             pass
@@ -597,6 +724,8 @@ def main() -> int:
     p_add.add_argument("--output", default="")
     p_add.add_argument("--log-file", default="")
     p_add.add_argument("--tags", default="")
+    p_add.add_argument("--pid", type=int, default=None)
+    p_add.add_argument("--pgid", type=int, default=None)
 
     p_upd = sub.add_parser("update", help="Update an existing task")
     p_upd.add_argument("--id", required=True)
@@ -606,6 +735,8 @@ def main() -> int:
     p_upd.add_argument("--exit-code", type=int, default=None)
     p_upd.add_argument("--output", default=None)
     p_upd.add_argument("--tags", default=None)
+    p_upd.add_argument("--pid", type=int, default=None)
+    p_upd.add_argument("--pgid", type=int, default=None)
 
     p_ls = sub.add_parser("list", help="List tasks")
     p_ls.add_argument("--status", default=None)
@@ -623,13 +754,18 @@ def main() -> int:
     p_mut = sub.add_parser("check-mutex", help="Exit non-zero if a running task matches all given tags")
     p_mut.add_argument("--tags", required=True, help="Comma-separated tags to check")
 
+    p_cancel = sub.add_parser("cancel", help="Cancel a running task by id")
+    p_cancel.add_argument("--id", required=True)
+    p_cancel.add_argument("--force", action="store_true", help="Use SIGKILL fallback if needed")
+
     args = ap.parse_args()
     if not args.command:
         ap.print_help()
         return 1
 
     cmds = {"add": cmd_add, "update": cmd_update, "list": cmd_list,
-            "serve": cmd_serve, "cleanup": cmd_cleanup, "check-mutex": cmd_check_mutex}
+            "serve": cmd_serve, "cleanup": cmd_cleanup,
+            "check-mutex": cmd_check_mutex, "cancel": cmd_cancel}
     return cmds[args.command](args)
 
 

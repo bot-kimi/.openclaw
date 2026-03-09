@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
+import signal
 import subprocess
 import sys
 import threading
@@ -38,7 +40,8 @@ def _taskboard_running() -> bool:
 
 
 def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str,
-                   log_file: str, tags: str | None = None) -> None:
+                   log_file: str, tags: str | None = None,
+                   pid: int | None = None, pgid: int | None = None) -> None:
     if not TASKBOARD_PY.exists():
         return
     try:
@@ -48,6 +51,10 @@ def _taskboard_add(task_id: str, label: str, cmd_str: str, start_iso: str,
                "--log-file", log_file]
         if tags:
             cmd += ["--tags", tags]
+        if pid is not None:
+            cmd += ["--pid", str(pid)]
+        if pgid is not None:
+            cmd += ["--pgid", str(pgid)]
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode != 0:
             sys.stderr.write(f"[wakebridge] taskboard add rc={p.returncode}: {p.stderr}\n")
@@ -107,8 +114,6 @@ def main() -> int:
             f"WB_START label={args.label} ts={start_iso} cmd={args.cmd}"
         )
 
-    if not args.no_taskboard:
-        _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path), args.tags)
 
     # ── System-alarm setup ──────────────────────────────────────────
     alarm_id: str | None = None
@@ -175,7 +180,18 @@ def main() -> int:
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        preexec_fn=os.setsid,
     )
+
+    proc_pgid = None
+    try:
+        proc_pgid = os.getpgid(proc.pid)
+    except OSError:
+        proc_pgid = None
+
+    if not args.no_taskboard:
+        _taskboard_add(task_id, args.label, args.cmd, start_iso, str(log_path), args.tags,
+                       pid=proc.pid, pgid=proc_pgid)
 
     timed_out = False
     timeout_timer: threading.Timer | None = None
@@ -184,9 +200,12 @@ def main() -> int:
             nonlocal timed_out
             timed_out = True
             try:
-                proc.kill()
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             except OSError:
-                pass
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
 
         timeout_timer = threading.Timer(args.timeout_sec, _on_timeout)
         timeout_timer.start()
