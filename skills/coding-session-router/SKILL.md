@@ -70,6 +70,15 @@ opencode session list
 
 When invoking these CLIs through OpenClaw `exec`, use `pty:true`.
 
+## WakeBridge alarm semantics (hard rule)
+
+When a long task is launched with WakeBridge/runlong:
+
+- Treat `timeout-sec` as **hard kill timeout** for the main task.
+- Treat `alarm-after-sec` as **first-check reminder time** (does not kill the task).
+- Do not set short `timeout-sec` values (e.g., 120s) just to implement a 2-minute check.
+- For training jobs, set a long `timeout-sec` and a short `alarm-after-sec` (commonly ~120s) for initial health check.
+
 ## Default behavior commitment
 
 For coding requests, if not explicitly trivial:
