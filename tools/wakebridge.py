@@ -108,6 +108,25 @@ def _taskboard_update(task_id: str, status: str, end_iso: str,
         sys.stderr.write(f"[wakebridge] taskboard update failed: {exc}\n")
 
 
+def _taskboard_get_status(task_id: str) -> str | None:
+    if not TASKBOARD_PY.exists():
+        return None
+    try:
+        p = subprocess.run(
+            [sys.executable, str(TASKBOARD_PY), "list", "--json"],
+            capture_output=True, text=True,
+        )
+        if p.returncode != 0:
+            return None
+        tasks = json.loads(p.stdout or "[]")
+        for t in tasks:
+            if t.get("id") == task_id:
+                return t.get("status")
+    except Exception:
+        return None
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run command and trigger OpenClaw system events on start/exit.")
     ap.add_argument("--cmd", required=True, help="Shell command to run")
@@ -137,10 +156,9 @@ def main() -> int:
     log_path.write_text("", encoding="utf-8")
 
     notify_enabled = bool(args.notify_channel and args.notify_target)
-    telegram_context = (
-        (os.environ.get("OPENCLAW_CHANNEL", "").strip().lower() == "telegram")
-        or ((args.notify_channel or "").strip().lower() == "telegram")
-    )
+    # Force hint for all WB events to make routing expectations explicit,
+    # regardless of runtime channel detection reliability.
+    telegram_context = True
 
     if not args.no_taskboard and not _taskboard_running():
         msg = (
@@ -304,9 +322,13 @@ def main() -> int:
         send_openclaw_message(args.notify_channel, args.notify_target, done_text)
 
     if not args.no_taskboard:
-        tb_status = "completed" if code == 0 and not timed_out else "failed"
-        _taskboard_update(task_id, tb_status, end_at.isoformat(timespec="seconds"),
-                          sec, code, tail_block)
+        # Preserve explicit manual cancellation from taskboard.cancel.
+        # If the task is already marked cancelled, do not overwrite it as failed/completed.
+        current_status = _taskboard_get_status(task_id)
+        if current_status != "cancelled":
+            tb_status = "completed" if code == 0 and not timed_out else "failed"
+            _taskboard_update(task_id, tb_status, end_at.isoformat(timespec="seconds"),
+                              sec, code, tail_block)
 
     # ── Cancel system-alarm if still running ────────────────────────
     if alarm_proc is not None and not alarm_done.is_set():
