@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import signal
 import subprocess
@@ -20,7 +21,7 @@ from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parent
 TASKBOARD_PY = TOOLS_DIR / "taskboard.py"
-TASKBOARD_URL = "http://127.0.0.1:9876/api/tasks"
+TASKBOARD_URL = os.environ.get("TASKBOARD_URL", "http://127.0.0.1:9876/api/tasks")
 TASKBOARD_LOG_DIR = TOOLS_DIR.parent / ".openclaw" / "taskboard" / "logs"
 
 
@@ -311,7 +312,24 @@ def main() -> int:
         tail_block = f"TIMEOUT after {args.timeout_sec}s — process killed\n{tail_block}"
         code = 124
 
-    status = "TIMEOUT" if timed_out else ("SUCCESS" if code == 0 else "FAILED")
+    # Check taskboard for cancellation BEFORE emitting WB_DONE so the event
+    # reports the authoritative status.  Race window: cancel may arrive while
+    # the process is exiting; reading taskboard here catches it.
+    cancelled = False
+    if not args.no_taskboard:
+        current_status = _taskboard_get_status(task_id)
+        cancelled = current_status == "cancelled"
+
+    if cancelled:
+        status = "CANCELLED"
+        code = -1
+    elif timed_out:
+        status = "TIMEOUT"
+    elif code == 0:
+        status = "SUCCESS"
+    else:
+        status = "FAILED"
+
     compact_tail = tail_block.replace("\n", "\\n")
     done_text = (
         f"WB_DONE label={args.label} status={status} exit={code} duration_s={sec} "
@@ -321,14 +339,10 @@ def main() -> int:
     if notify_enabled:
         send_openclaw_message(args.notify_channel, args.notify_target, done_text)
 
-    if not args.no_taskboard:
-        # Preserve explicit manual cancellation from taskboard.cancel.
-        # If the task is already marked cancelled, do not overwrite it as failed/completed.
-        current_status = _taskboard_get_status(task_id)
-        if current_status != "cancelled":
-            tb_status = "completed" if code == 0 and not timed_out else "failed"
-            _taskboard_update(task_id, tb_status, end_at.isoformat(timespec="seconds"),
-                              sec, code, tail_block)
+    if not args.no_taskboard and not cancelled:
+        tb_status = "completed" if code == 0 and not timed_out else "failed"
+        _taskboard_update(task_id, tb_status, end_at.isoformat(timespec="seconds"),
+                          sec, code, tail_block)
 
     # ── Cancel system-alarm if still running ────────────────────────
     if alarm_proc is not None and not alarm_done.is_set():
